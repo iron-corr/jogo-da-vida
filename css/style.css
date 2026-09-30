@@ -1,0 +1,176 @@
+/* Estética no estilo Kittens Game: página branca, fonte comum, texto denso, botões simples. */
+:root {
+  color-scheme: light;
+  --bg: #ffffff;
+  --fg: #000000;
+  --muted: #777777;
+  --line: #d6d6d6;
+  --btn: #fafafa;
+  --btn-border: #9a9a9a;
+  --btn-hover: #ececec;
+  --link: #1a4fa0;
+  --accent: #1a4fa0;
+  --up: #237a2b;
+  --down: #b3261e;
+  --warn: #9a5b00;
+  --bar: #6aa06a;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1b1b1b;
+  --fg: #d8d8d8;
+  --muted: #8c8c8c;
+  --line: #3a3a3a;
+  --btn: #262626;
+  --btn-border: #5a5a5a;
+  --btn-hover: #323232;
+  --link: #8ab4f8;
+  --accent: #8ab4f8;
+  --up: #6fbf73;
+  --down: #ef7b72;
+  --warn: #e0a54a;
+  --bar: #5a9e5a;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 13px/1.45 Verdana, Tahoma, "Segoe UI", Arial, sans-serif;
+}
+h1, h2, h3, h4 { margin: 0; font-weight: bold; }
+h1 { font-size: 16px; }
+h2 { font-size: 13px; margin-bottom: 6px; }
+h3 { font-size: 13px; margin-bottom: 4px; }
+h4 { font-size: 11px; margin: 12px 0 3px; color: var(--muted); font-weight: normal; }
+p { margin: 3px 0; }
+small { color: var(--muted); font-size: 11px; }
+.muted { color: var(--muted); }
+.good { color: var(--up); }
+.bad { color: var(--down); }
+
+/* Topo */
+header {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px;
+  padding: 8px 14px; border-bottom: 1px solid var(--line);
+}
+#clock { color: var(--muted); }
+.controls { margin-left: auto; display: flex; flex-wrap: wrap; gap: 4px; align-items: baseline; }
+#dbg-info { color: var(--warn); font-size: 11px; margin-left: 6px; }
+
+/* Botões: retângulos claros de borda cinza, como os do Kittens */
+button {
+  font: inherit; color: var(--fg); background: var(--btn);
+  border: 1px solid var(--btn-border); border-radius: 2px; padding: 4px 9px; cursor: pointer;
+}
+button:hover:not(:disabled) { background: var(--btn-hover); }
+button:disabled { color: var(--muted); border-color: var(--line); cursor: default; }
+button.active { font-weight: bold; }
+button.link, button.tablink {
+  border: 0; background: none; padding: 0; color: var(--link); cursor: pointer;
+}
+button.link:hover, button.tablink:hover { text-decoration: underline; background: none; }
+button.tablink.active { color: var(--fg); font-weight: bold; text-decoration: none; }
+input {
+  font: inherit; color: var(--fg); background: var(--bg);
+  border: 1px solid var(--btn-border); border-radius: 2px; padding: 3px 6px; width: 130px;
+}
+
+/* Três colunas: recursos | jogo | jornal */
+#game {
+  display: grid; grid-template-columns: 230px minmax(0, 1fr) 300px; gap: 20px;
+  padding: 12px 14px; max-width: 1400px; margin: 0 auto;
+}
+
+#resources { font-size: 12px; }
+.row { display: flex; justify-content: space-between; gap: 8px; padding: 1px 0; }
+.bar { height: 4px; background: var(--line); margin: 1px 0 5px; }
+.bar i { display: block; height: 100%; background: var(--bar); transition: width 0.2s; }
+
+#tabs { margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+#tabs .sep { color: var(--muted); margin: 0 7px; }
+
+/* "Cards" viram blocos simples separados por linhas finas */
+.card { padding: 8px 0 10px; border-bottom: 1px solid var(--line); }
+.card:last-child { border-bottom: 0; }
+.btns { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px; margin: 6px 0; }
+.btns button { text-align: left; }
+
+.summary { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+.check { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+.check input { width: auto; }
+.filters { margin: 8px 0 2px; }
+.filters button { margin-right: 4px; }
+
+.asset-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.asset-head h3 { margin: 0; }
+.tag { font-size: 11px; color: var(--muted); }
+.yield { margin-left: auto; }
+.asset-pos { margin: 4px 0; }
+.asset-ops { display: flex; flex-wrap: wrap; gap: 4px; }
+canvas.spark { display: block; width: 100%; height: 30px; margin: 4px 0; }
+canvas.spark.tall { height: 60px; }
+
+.tbl { width: 100%; border-collapse: collapse; }
+.tbl td { padding: 4px 6px 4px 0; border-top: 1px solid var(--line); vertical-align: top; }
+.tbl tr.cur td { font-weight: bold; }
+.tbl td.ops button { margin: 0 4px 4px 0; }
+
+.research { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 0; border-top: 1px solid var(--line); }
+.research:first-of-type { border-top: 0; }
+.research button { flex-shrink: 0; }
+.research.locked b { color: var(--muted); font-weight: normal; }
+.research.done { padding: 3px 0; }
+.research.done b { font-weight: normal; color: var(--up); }
+
+/* Jornal (coluna da direita, como o log do Kittens) */
+#journal { font-size: 12px; border-left: 1px solid var(--line); padding-left: 14px; }
+#log { list-style: none; margin: 0; padding: 0; max-height: calc(100vh - 150px); overflow-y: auto; }
+#log li { padding: 2px 0; }
+#log time { color: var(--muted); margin-right: 6px; }
+#log .k-good { color: var(--up); }
+#log .k-bad { color: var(--down); }
+#log .k-unlock { font-weight: bold; }
+#log .k-politica { color: var(--warn); }
+#log .k-hint { color: var(--link); font-style: italic; }
+.save-ops { display: flex; gap: 12px; margin-top: 10px; padding-top: 6px; border-top: 1px solid var(--line); }
+
+@media (max-width: 1000px) {
+  #game { grid-template-columns: 200px minmax(0, 1fr); }
+  #journal { grid-column: 1 / -1; border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 8px; }
+  #log { max-height: 300px; }
+}
+@media (max-width: 640px) {
+  #game { grid-template-columns: 1fr; }
+  .controls { margin-left: 0; }
+  input { width: 100%; }
+}
+
+input.num { width: 52px; text-align: right; }
+select { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--btn-border); border-radius: 2px; padding: 2px 4px; }
+.tbl.alloc td { padding: 2px 6px 2px 0; }
+
+.card.alert { border: 1px solid var(--down); padding: 8px 10px; margin: 6px 0; }
+.btns button small { display: block; }
+
+canvas.zoom { cursor: zoom-in; }
+.row[title] { cursor: help; }
+#hint { border: 1px dashed var(--btn-border); padding: 6px 10px; margin-bottom: 10px; }
+#hint button { margin-left: 8px; }
+#modal { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); display: flex; align-items: center; justify-content: center; z-index: 10; padding: 16px; }
+#modal[hidden] { display: none !important; }
+.modal-box { background: var(--bg); border: 1px solid var(--btn-border); padding: 12px 14px; width: min(900px, 100%); }
+.modal-head { display: flex; justify-content: space-between; align-items: baseline; }
+#modal-c { display: block; width: 100%; height: 320px; margin-top: 6px; }
+.tbl.stats td:nth-child(even) { text-align: right; padding-right: 16px; }
+
+/* Filtros do jornal, janelas de texto, frações e próximos passos */
+#log-filters { margin-bottom: 6px; font-size: 11px; }
+#log-filters button.active { color: var(--fg); font-weight: bold; text-decoration: none; }
+#modal-text { max-height: 70vh; overflow-y: auto; margin-top: 6px; }
+#modal-text p { margin: 6px 0; }
+.frac { display: inline-flex; gap: 2px; align-items: baseline; margin-left: 6px; }
+.frac button { padding: 2px 5px; font-size: 11px; }
+.goal { font-size: 11px; color: var(--muted); padding: 1px 0; }

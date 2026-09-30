@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Juros Compostos</title>
+  <script>
+    // Aplica o tema salvo antes de pintar a página (evita piscar branco no tema escuro).
+    try { document.documentElement.dataset.theme = localStorage.getItem('juros-compostos-tema') || 'light'; } catch (e) {}
+  </script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <h1>Juros Compostos</h1>
+    <span id="clock"></span>
+    <div class="controls">
+      <button data-act="speed" data-v="0" title="Pausar (espaço)">❚❚</button>
+      <button data-act="speed" data-v="1" title="Velocidade normal (tecla 1)">1×</button>
+      <button data-act="speed" data-v="2" title="Velocidade dobrada (tecla 2)">2×</button>
+      <button data-act="speed" data-v="3" id="b-sp3" title="Tecla 3" hidden>3×</button>
+      <button data-act="speed" data-v="5" id="b-sp5" title="Tecla 5" hidden>5×</button>
+      <span id="debug-controls" hidden>
+        <button data-act="speed" data-v="20">20×</button>
+        <button data-act="speed" data-v="200">200×</button>
+        <button data-act="dbg-cash">+R$10k</button>
+        <button data-act="dbg-know">+100 conhec.</button>
+        <button data-act="dbg-regime">próx. regime</button>
+        <span id="dbg-info"></span>
+      </span>
+      <label class="check" title="Pausa o jogo em pânicos, demissões, escândalos, decisões e outros momentos importantes"><input type="checkbox" data-act="autopause" id="b-autopause"> pausar em eventos</label>
+      <button data-act="theme" id="b-theme" class="link">Tema escuro</button>
+    </div>
+  </header>
+
+  <div id="game">
+    <aside id="resources"></aside>
+
+    <main id="center">
+      <nav id="tabs"></nav>
+      <div id="decision" hidden></div>
+      <div id="hint" hidden></div>
+      <div id="tab-body"></div>
+    </main>
+
+    <aside id="journal">
+      <h2>Jornal</h2>
+      <div id="log-filters"></div>
+      <ul id="log"></ul>
+      <div class="save-ops">
+        <button data-act="export" class="link">Exportar save</button>
+        <button data-act="import" class="link">Importar</button>
+        <input type="file" id="import-file" accept=".txt,text/plain" hidden>
+        <button data-act="reset" class="link">Reiniciar</button>
+        <button data-act="undo-reset" class="link" id="b-undo" hidden>Desfazer reinício</button>
+      </div>
+    </aside>
+  </div>
+
+  <div id="modal" hidden>
+    <div class="modal-box">
+      <div class="modal-head"><h3 id="modal-title"></h3><button data-act="modal-close" class="link">fechar</button></div>
+      <p id="modal-info" class="muted"></p>
+      <canvas id="modal-c"></canvas>
+      <div id="modal-text" hidden></div>
+    </div>
+  </div>
+
+  <script src="js/rng.js"></script>
+  <script src="js/format.js"></script>
+  <script src="js/calendar.js"></script>
+  <script src="js/data/assets.js"></script>
+  <script src="js/data/research.js"></script>
+  <script src="js/macro.js"></script>
+  <script src="js/market.js"></script>
+  <script src="js/events.js"></script>
+  <script src="js/tax.js"></script>
+  <script src="js/portfolio.js"></script>
+  <script src="js/realty.js"></script>
+  <script src="js/agro.js"></script>
+  <script src="js/angel.js"></script>
+  <script src="js/automation.js"></script>
+  <script src="js/business.js"></script>
+  <script src="js/fund.js"></script>
+  <script src="js/social.js"></script>
+  <script src="js/politics.js"></script>
+  <script src="js/legacy.js"></script>
+  <script src="js/life.js"></script>
+  <script src="js/choices.js"></script>
+  <script src="js/work.js"></script>
+  <script src="js/research.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
