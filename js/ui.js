@@ -1772,7 +1772,7 @@
       reset();
       G.news('Save importado.', 'info');
     } catch (err) {
-      alert('Esse arquivo não é um save válido do Juros Compostos.');
+      alert('Esse arquivo não é um save válido do Jogo da Vida.');
     }
   }
 
