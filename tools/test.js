@@ -570,5 +570,11 @@ S.energy = 100; G.dynasty.spendTime(S, c64.id); eq('passar tempo: +6', c64.bond,
 S = G.newState(65); const x65 = S.fam.list.albuquerque, old65 = x65.leader.name; x65.leader.age = x65.leader.dies;
 G.families.monthly(S); eq('novo líder assume', x65.leader.name !== old65 || x65.leader.age < 60 ? 1 : 0, 1);
 
+// 66) jornal nos dois idiomas: cada notícia é gravada também no outro idioma
+S = G.newState(66); S.cash = 1e6; S.research.imoveis = true; S.market.prices.imob = 100; G.realty.buy(S, 'kitnet', false);
+const e66 = S.log[0];
+eq('notícia gravada com a versão em inglês', e66.t2 && /^You bought: downtown studio for R\$ 180,000\./.test(e66.t2) ? 1 : 0, 1);
+eq('versão em português intacta', /^Você comprou: kitnet no centro por R\$ 180\.000\./.test(e66.t) ? 1 : 0, 1);
+
 console.log(ok ? '\nTODOS OK' : '\nHÁ FALHAS');
 process.exitCode = ok ? 0 : 1;

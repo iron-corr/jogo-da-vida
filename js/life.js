@@ -353,7 +353,7 @@
       if (!was || S.settings.retro === false) return;
       const year = c.year - 1, d = k => now[k] - was[k];
       const pick = kind => S.log.find(e => e.d >= was.day && e.k === kind);
-      const marks = [pick('unlock'), pick('good'), pick('bad')].filter(Boolean).map(e => `${G.fmt.date(e.d)} · ${e.t}`);
+      const marks = [pick('unlock'), pick('good'), pick('bad')].filter(Boolean).map(e => `${G.fmt.date(e.d)} · ${G.i18n.show(e.t, e.t2, e.l)}`);
       const growth = was.real > 0 ? now.real / was.real - 1 : 0;
       const verdict = well >= 70 ? tr('Um ano bom de viver.', 'A good year to be alive.') : well >= 50 ? tr('Um ano razoável.', 'A decent year.')
         : well >= 35 ? tr('Um ano pesado.', 'A heavy year.') : tr('Um ano difícil, daqueles que a gente quer esquecer.', 'A hard year, the kind you want to forget.');

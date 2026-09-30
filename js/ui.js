@@ -1582,7 +1582,7 @@
           }
           const crop = A.PLANTED[x.planted && x.planted.crop] || (x.planted && x.planted.crop);
           const planted = x.planted ? tr(`${crop} plantado, colheita em ${f.MESES[x.planted.harvest - 1]}`, `${crop} planted, harvest in ${f.MESES[x.planted.harvest - 1]}`) : '';
-          set(`t-s-${i}`, x.selling ? tr(`à venda: ~${x.selling} dias`, `for sale: ~${x.selling} days`) : [planted, x.last].filter(Boolean).join(' · ') || A.CROPS[x.crop].n.toLowerCase());
+          set(`t-s-${i}`, x.selling ? tr(`à venda: ~${x.selling} dias`, `for sale: ~${x.selling} days`) : [planted, G.i18n.show(x.last, x.last2, x.lastL)].filter(Boolean).join(' · ') || A.CROPS[x.crop].n.toLowerCase());
         });
       },
     },
@@ -1925,7 +1925,7 @@
         if (!A.deals.length) h += tr('<p class="muted">Novas rodadas aparecem todo mês.</p>', '<p class="muted">New rounds show up every month.</p>');
         A.deals.forEach((d, i) => {
           const cls = d.signal === 'forte' ? 'good' : d.signal === 'fraca' ? 'bad' : '';
-          h += `<div class="research"><div><b>${d.name}</b> <span class="muted">— ${d.pitch}</span>
+          h += `<div class="research"><div><b>${d.name}</b> <span class="muted">— ${G.i18n.show(d.pitch, d.pitch2, d.pitchL)}</span>
             <p>${tr('Tração', 'Traction')} <b class="${cls}">${G.angel.SIGNAL_NAMES[d.signal] || d.signal}</b> · ${tr('cheque de', 'check of')} ${f.money(d.ticket)} · <span class="muted" id="an-d-${i}"></span></p></div>
             <button data-act="angel" data-i="${i}" id="b-an-${i}">${tr('Investir', 'Invest')}</button></div>`;
         });
@@ -2104,11 +2104,15 @@
     $('log').innerHTML = S.log
       .filter(e => !kinds || kinds.includes(e.k))
       .slice(0, 40)
-      .map(e => `<li class="k-${e.k}"><time>${f.date(e.d)}</time> ${esc(e.t)}</li>`)
+      .map(e => `<li class="k-${e.k}"><time>${f.date(e.d)}</time> ${esc(G.i18n.show(e.t, e.t2, e.l))}</li>`)
       .join('');
   }
 
   function render() {
+    G.i18n.rec = false; // a tela não grava textos: nada a registrar
+    try { renderAll(); } finally { G.i18n.rec = true; }
+  }
+  function renderAll() {
     const S = G.S;
     const cs = getComputedStyle(document.body);
     colors = { up: cs.getPropertyValue('--up').trim(), down: cs.getPropertyValue('--down').trim(), accent: cs.getPropertyValue('--warn').trim(), muted: cs.getPropertyValue('--muted').trim() };

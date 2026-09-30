@@ -5,6 +5,7 @@
   const VERSION = 12;
 
   G.newState = function (seed = (Date.now() ^ Math.floor(Math.random() * 1e9)) | 0) {
+    if (G.i18n) G.i18n.phase = 'game'; // acabou o carregamento: daqui em diante os textos são do jogo
     const S = {
       v: VERSION, rng: seed, day: 0, speed: 1,
       cash: 300, knowledge: 0, reputation: 0, energy: 100, burnout: 0,
@@ -32,7 +33,8 @@
 
   G.news = function (text, kind = 'info') {
     const S = G.S;
-    S.log.unshift({ d: S.day, t: text, k: kind });
+    const b = G.i18n.both(text); // guarda a notícia nos dois idiomas
+    S.log.unshift({ d: S.day, t: b.t, t2: b.t2, l: b.l, k: kind });
     if (S.log.length > 100) S.log.pop();
   };
 
@@ -132,6 +134,7 @@
     } catch (e) { /* sem storage (aba privada etc.): segue sem salvar */ }
   };
   G.load = function () {
+    if (G.i18n) G.i18n.phase = 'game';
     try {
       const raw = localStorage.getItem(KEY);
       return raw ? migrate(JSON.parse(raw)) : null;

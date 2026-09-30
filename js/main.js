@@ -115,7 +115,7 @@
     G.popup(G.S, tr('Enquanto você esteve fora', 'While you were away'), [
       [tr('Dias que passaram', 'Days passed'), String(days)],
       [tr('Patrimônio', 'Net worth'), `${G.fmt.money(before)} → ${G.fmt.money(after)}`],
-      ...notable.map(e => `${G.fmt.date(e.d)} · ${e.t}`),
+      ...notable.map(e => `${G.fmt.date(e.d)} · ${G.i18n.show(e.t, e.t2, e.l)}`),
       notable.length ? '' : tr('Nada de muito marcante: o dinheiro trabalhou em silêncio.', 'Nothing remarkable: your money worked quietly.'),
     ].filter(Boolean));
     G.popups[G.popups.length - 1].resume = speed;

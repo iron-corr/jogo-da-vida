@@ -34,9 +34,10 @@
     const f = fate();
     const acc = (S.research.due_diligence ? 0.85 : 0.5) + (S.social.clubs.golfe ? 0.1 : 0);
     const ticket = Math.max(25000, Math.round((G.portfolio.netWorth(S) * 0.01) / 5000) * 5000);
+    const pitch = `${G.rng.item(PITCH)} ${G.rng.item(TOPIC)}`;
     return {
       name: G.angel.newName(),
-      pitch: `${G.rng.item(PITCH)} ${G.rng.item(TOPIC)}`,
+      pitch, pitch2: G.i18n.other(pitch), pitchL: G.lang,
       ticket, until: S.day + DEAL_DAYS,
       signal: G.rng.chance(acc) ? trueSignal(f.mult) : G.rng.item(SIGNALS),
       mult: f.mult, exit: f.exit,

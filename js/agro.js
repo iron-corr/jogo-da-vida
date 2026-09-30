@@ -35,6 +35,12 @@
   const ITBI = 0.03, BROKER = 0.06, MANAGER_FEE = 0.12, TAX = 0.15, INSURANCE = 0.04;
   const money = v => G.fmt.money(v);
   const land = id => LANDS.find(l => l.id === id);
+  // Andamento da terra, gravado nos dois idiomas (ver G.i18n).
+  const setLast = (h, text) => {
+    h.last = text;
+    h.last2 = G.i18n.other(text);
+    h.lastL = G.lang;
+  };
 
   const A = G.agro = {
     LANDS, CROPS, CLIMATES, MANAGER_FEE, PLANTED,
@@ -93,7 +99,7 @@
       if (!h || !land(h.id).crops.includes(crop) || h.crop === crop) return;
       h.crop = crop;
       h.planted = null; // troca de cultura perde o que estava plantado
-      h.last = crop === 'arrendar' ? tr('arrendada', 'leased out') : tr('aguardando a época de plantio', 'waiting for planting season');
+      setLast(h, crop === 'arrendar' ? tr('arrendada', 'leased out') : tr('aguardando a época de plantio', 'waiting for planting season'));
     },
     hire(S, i) {
       const h = S.agro.lands[i];
@@ -160,15 +166,15 @@
           const [wName, wf] = A.weather(S, l.region);
           const gross = (v * 0.07) / 12 * p * (0.7 + 0.3 * cf) * (wf < 1 ? 0.85 : 1);
           A.harvest(S, h, gross, 0, gross);
-          h.last = tr(`gado: ${money(gross)} no mês${wf < 1 ? ` (pasto afetado: ${wName})` : ''}`,
-            `cattle: ${money(gross)} this month${wf < 1 ? ` (pasture hit: ${wName})` : ''}`);
+          setLast(h, tr(`gado: ${money(gross)} no mês${wf < 1 ? ` (pasto afetado: ${wName})` : ''}`,
+            `cattle: ${money(gross)} this month${wf < 1 ? ` (pasture hit: ${wName})` : ''}`));
         } else if (h.crop === 'soja') {
           if (c.month === 10) { // plantio
             const expected = v * 0.2 * p, cost = 0.5 * expected + (h.insured ? INSURANCE * expected : 0);
             S.cash -= cost;
             h.planted = { crop: 'soja', cost, expected, harvest: 2 };
-            h.last = tr(`soja plantada: ${money(cost)} em insumos${h.insured ? ' e seguro' : ''}`,
-              `soy planted: ${money(cost)} in inputs${h.insured ? ' and insurance' : ''}`);
+            setLast(h, tr(`soja plantada: ${money(cost)} em insumos${h.insured ? ' e seguro' : ''}`,
+              `soy planted: ${money(cost)} in inputs${h.insured ? ' and insurance' : ''}`));
           }
           if (c.month === 2 && S.research.safrinha && h.planted === null) { // milho safrinha depois da soja
             const expected = v * 0.07 * p, cost = 0.5 * expected;
@@ -179,8 +185,8 @@
             const [wName, wf] = A.weather(S, l.region), pl = h.planted;
             const net = A.harvest(S, h, pl.expected * cf * wf, pl.cost, pl.expected);
             h.planted = null;
-            h.last = tr(`colheita de ${PLANTED[pl.crop]} (${wName}): ${net >= 0 ? 'lucro' : 'prejuízo'} de ${money(Math.abs(net))}`,
-              `${PLANTED[pl.crop]} harvest (${wName}): ${net >= 0 ? 'profit' : 'loss'} of ${money(Math.abs(net))}`);
+            setLast(h, tr(`colheita de ${PLANTED[pl.crop]} (${wName}): ${net >= 0 ? 'lucro' : 'prejuízo'} de ${money(Math.abs(net))}`,
+              `${PLANTED[pl.crop]} harvest (${wName}): ${net >= 0 ? 'profit' : 'loss'} of ${money(Math.abs(net))}`));
             G.news(`${l.n}: ${h.last}.`, net >= 0 ? 'good' : 'bad');
             if (wf > 1) G.legacy.flag(S, 'safra');
             if (pl.crop === 'soja' && S.research.safrinha) { // planta o milho logo em seguida
@@ -204,8 +210,8 @@
             const frost = h.frost === 2 ? 0.3 : h.frost === 1 ? 0.6 : 1;
             h.frost = Math.max(0, h.frost - 1);
             const net = A.harvest(S, h, expected * cf * wf * frost, v * 0.13, expected);
-            h.last = tr(`colheita de café, ano ${even ? 'de alta' : 'de baixa'} (${frost < 1 ? 'geada' : wName}): ${money(net)}`,
-              `coffee harvest, ${even ? 'on' : 'off'} year (${frost < 1 ? 'frost' : wName}): ${money(net)}`);
+            setLast(h, tr(`colheita de café, ano ${even ? 'de alta' : 'de baixa'} (${frost < 1 ? 'geada' : wName}): ${money(net)}`,
+              `coffee harvest, ${even ? 'on' : 'off'} year (${frost < 1 ? 'frost' : wName}): ${money(net)}`));
             G.news(`${l.n}: ${h.last}.`, net >= 0 ? 'good' : 'bad');
             if (wf > 1 && frost === 1) G.legacy.flag(S, 'safra');
           }
