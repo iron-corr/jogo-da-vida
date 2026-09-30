@@ -2,7 +2,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const root = path.join(__dirname, '..');
 const ctx = vm.createContext({ console });
-for (const f of ['i18n', 'rng', 'format', 'calendar', 'data/assets', 'events', 'tax', 'portfolio', 'realty', 'agro', 'angel', 'automation', 'business', 'fund', 'social', 'politics', 'families', 'nation', 'legacy', 'life', 'choices', 'work', 'macro', 'market', 'state'])
+for (const f of ['i18n', 'rng', 'format', 'calendar', 'data/assets', 'events', 'tax', 'portfolio', 'realty', 'agro', 'angel', 'automation', 'business', 'fund', 'social', 'politics', 'families', 'nation', 'legacy', 'dynasty', 'life', 'choices', 'work', 'macro', 'market', 'state'])
   vm.runInContext(fs.readFileSync(path.join(root, 'js', f + '.js'), 'utf8'), ctx);
 const G = ctx.G;
 let ok = true;
@@ -247,6 +247,7 @@ eq('PL com herdeiro', G.legacy.points(S), 36);
 
 // 31) sucessão: mundo continua, herança de 2% − ITCMD, pesquisas de berço
 S = G.newState(31); S.day = 20000; S.cash = 1e8; S.social.family.kids = 1; S.legacy.up = { educacao: 1 };
+G.dynasty.children(S)[0].born = S.day - 25 * 360;
 const selic31 = S.macro.selic, lp31 = G.legacy.points(S);
 const heir = G.legacy.succeed(S, 'aposentadoria');
 eq('herdeiro no mesmo dia do mundo', heir.day, 20000);
@@ -269,7 +270,7 @@ eq('morte: herança inteira de uma vez', heirD.cash - 300 * heirD.macro.priceInd
 eq('morte: ninguém fica com patrimônio', heirD.legacy.elders.length, 0);
 eq('PL somados', heir.legacy.lp, lp31);
 eq('geração 2', heir.legacy.generation, 2);
-eq('idade do herdeiro', G.legacy.age(heir), 22);
+eq('herdeiro assume com a idade real (25)', G.legacy.age(heir), 25);
 eq('educação de berço', heir.research.rotina && heir.research.edu_fin ? 1 : 0, 1);
 eq('carreira zerada', heir.job.level, 0);
 
@@ -535,6 +536,39 @@ eq('o país continua no herdeiro', heir61.nation === S.nation ? 1 : 0, 1);
 S = G.newState(62); const n62 = S.nation; n62.president = { since: 0, until: 1e9, term: 1, platform: 'moderado' };
 n62.stance = 2; const d62 = n62.debt; for (let m = 0; m < 12; m++) G.nation.monthly(S, { month: 3, year: 2027 });
 eq('gasto forte aumenta a dívida', n62.debt > d62 ? 1 : 0, 1);
+
+// 63) dinastia: filhos com nome e aptidões, educação, saída de casa, herdeiro escolhido e parentes
+S = G.newState(63); S.cash = 1e8; G.social.marry(S, false);
+eq('cônjuge tem nome', S.social.family.spouse ? 1 : 0, 1);
+S.social.family.pregnant = { due: S.day }; G.social.kidMonthly(S);
+const c63 = G.dynasty.children(S)[0];
+eq('filho nasce com nome e sonho', c63.name && c63.dream ? 1 : 0, 1);
+G.dynasty.setFocus(S, c63.id, 'pol'); c63.apt.pol = 100; c63.dream = 'pol';
+const cash63 = S.cash; G.dynasty.monthly(S);
+eq('foco na educação custa R$ 3 mil/mês', cash63 - S.cash, 3000);
+eq('habilidade cresce em direção à aptidão (1,6% ao mês com foco)', c63.skill.pol, 1.6);
+eq('família de 3 em casa', G.social.familySize(S), 3);
+S.day += 22 * 360; eq('aos 22 o filho sai de casa', G.social.familySize(S), 2);
+S.social.family.kids = 2; const c63b = G.dynasty.children(S)[0]; // o segundo filho entra no começo da lista
+c63.skill.pol = 80; G.dynasty.setHeir(S, c63.id);
+const inf63 = G.dynasty.heirBonus(c63).influence;
+const heir63 = G.legacy.succeed(S, 'morte');
+eq('herdeiro escolhido assume', heir63.me.name === c63.name ? 1 : 0, 1);
+eq('habilidade política vira influência (80 × 1,5)', heir63.pol.influence, inf63);
+eq('irmão vira parente da dinastia', heir63.legacy.relatives.some(r => r.name === c63b.name) ? 1 : 0, 1);
+eq('sobrenome continua', heir63.legacy.surname === S.legacy.surname ? 1 : 0, 1);
+
+// 64) forçar uma área longe do sonho desgasta a relação; passar tempo junto recupera
+S = G.newState(64); S.social.family.kids = 1; const c64 = G.dynasty.children(S)[0];
+c64.dream = 'art'; G.dynasty.setFocus(S, c64.id, 'fin'); const chance64 = G.rng.chance; G.rng.chance = () => false;
+for (let m = 0; m < 10; m++) G.dynasty.monthly(S);
+G.rng.chance = chance64;
+eq('10 meses forçando finanças: relação −6', c64.bond, 54);
+S.energy = 100; G.dynasty.spendTime(S, c64.id); eq('passar tempo: +6', c64.bond, 60);
+
+// 65) famílias rivais trocam de líder quando ele morre
+S = G.newState(65); const x65 = S.fam.list.albuquerque, old65 = x65.leader.name; x65.leader.age = x65.leader.dies;
+G.families.monthly(S); eq('novo líder assume', x65.leader.name !== old65 || x65.leader.age < 60 ? 1 : 0, 1);
 
 console.log(ok ? '\nTODOS OK' : '\nHÁ FALHAS');
 process.exitCode = ok ? 0 : 1;

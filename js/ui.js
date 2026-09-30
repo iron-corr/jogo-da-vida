@@ -16,6 +16,7 @@
     ['imoveis', tr('Imóveis', 'Real estate')],
     ['terras', tr('Terras', 'Land')],
     ['startups', 'Startups'],
+    ['dinastia', tr('Dinastia', 'Dynasty')],
     ['familias', tr('Famílias', 'Families')],
     ['brasil', tr('Brasil', 'Brazil')],
     ['legado', tr('Legado', 'Legacy')],
@@ -1308,7 +1309,7 @@
           <p>Bem-estar médio desta vida: <b id="l-well"></b> <span class="muted">(acima de 40, cada ponto rende legado; hoje vale <span id="l-wellpts"></span> pontos)</span></p>
           <p>Se você morrer, seu herdeiro recebe <b id="l-heir"></b> de uma vez <span class="muted">(${G.fmt.pct(LG.heirShare(S), 0)} do patrimônio, menos 8% de ITCMD)</span>.
           Se você se aposentar, ele recebe <b id="l-gift"></b> agora, como doação em vida, e <b id="l-kept"></b> ficam com você: rendem, pagam seu custo de vida
-          e o que sobrar vira herança quando você morrer. Nos dois casos ele recomeça como estagiário, no mesmo mundo e no mesmo ano.</p>`,
+          e o que sobrar vira herança quando você morrer. Nos dois casos, o herdeiro escolhido na aba Dinastia assume com a idade e as habilidades que tem, no mesmo mundo e no mesmo ano.</p>`,
           `<section class="card summary"><span>Generation <b>${L.generation}</b></span><span>Age <b id="l-age"></b></span>
           <span>Health <b id="l-health"></b></span><span>Legacy points <b id="l-lp"></b></span></section>
           <section class="card"><h3>Succession</h3>
@@ -1317,11 +1318,11 @@
           <p>Average well-being this life: <b id="l-well"></b> <span class="muted">(above 40, each point earns legacy; currently worth <span id="l-wellpts"></span> points)</span></p>
           <p>If you die, your heir receives <b id="l-heir"></b> all at once <span class="muted">(${G.fmt.pct(LG.heirShare(S), 0)} of net worth, minus 8% inheritance tax)</span>.
           If you retire, they receive <b id="l-gift"></b> now, as a lifetime gift, and <b id="l-kept"></b> stay with you: it earns returns, pays your cost of living
-          and whatever is left becomes an inheritance when you die. Either way they start over as an intern, in the same world and the same year.</p>`);
+          and whatever is left becomes an inheritance when you die. Either way, the heir chosen in the Dynasty tab takes over at their age and with their skills, in the same world and the same year.</p>`);
         const elders = LG.elders(S);
         if (elders.length) {
           h += `<p>${tr('Gerações anteriores vivas', 'Living previous generations')}:</p><ul>` + elders.map((e, i) =>
-            `<li>${tr(`${e.gen}ª geração, aposentada`, `Generation ${e.gen}, retired`)}: <span id="l-el-${i}"></span></li>`).join('') + '</ul>';
+            `<li>${e.name ? `${esc(e.name)}, ` : ''}${tr(`${e.gen}ª geração, aposentada`, `generation ${e.gen}, retired`)}: <span id="l-el-${i}"></span></li>`).join('') + '</ul>';
         }
         if (S.social.family.kids === 0) h += tr('<p class="bad">Você ainda não tem filhos (aba Vida → Família).</p>', '<p class="bad">You have no children yet (Life tab → Family).</p>');
         h += LG.age(S) >= LG.HEIR_AGE
@@ -1358,12 +1359,12 @@
         }
         h += '</table></section>';
         if (L.history.length) {
-          h += tr('<section class="card"><h3>Dinastia</h3><table class="tbl"><tr><td><b>Geração</b></td><td><b>Anos</b></td><td><b>Patrimônio final (R$ de 2026)</b></td><td><b>Pontos</b></td></tr>',
-            '<section class="card"><h3>Dynasty</h3><table class="tbl"><tr><td><b>Generation</b></td><td><b>Years</b></td><td><b>Final net worth (2026 R$)</b></td><td><b>Points</b></td></tr>');
+          h += tr('<section class="card"><h3>Gerações</h3><table class="tbl"><tr><td><b>Geração</b></td><td><b>Anos</b></td><td><b>Patrimônio final (R$ de 2026)</b></td><td><b>Pontos</b></td></tr>',
+            '<section class="card"><h3>Generations</h3><table class="tbl"><tr><td><b>Generation</b></td><td><b>Years</b></td><td><b>Final net worth (2026 R$)</b></td><td><b>Points</b></td></tr>');
           for (const g of L.history) {
             const fate = g.reason === 'morte' ? tr(`morreu aos ${g.age}`, `died at ${g.age}`)
               : tr(`aposentou aos ${g.age}`, `retired at ${g.age}`) + (g.died ? tr(`, morreu aos ${g.died}`, `, died at ${g.died}`) : '');
-            h += `<tr><td>${tr(`${g.gen}ª`, `#${g.gen}`)}</td><td>${g.from}–${g.to} (${fate})</td><td>${f.money(g.nw)}</td><td>+${g.lp}</td></tr>`;
+            h += `<tr><td>${tr(`${g.gen}ª`, `#${g.gen}`)}${g.name ? ` · ${esc(g.name)}` : ''}</td><td>${g.from}–${g.to} (${fate})</td><td>${f.money(g.nw)}</td><td>+${g.lp}</td></tr>`;
           }
           h += '</table></section>';
         }
@@ -1660,6 +1661,96 @@
       },
     },
 
+    dinastia: {
+      key: S => {
+        const D = G.dynasty, f = S.social.family;
+        return [D.surname(S), S.me && S.me.name, f.married, f.spouse, D.children(S).map(c => c.id + (D.age(S, c) >= D.ADULT ? 'a' : '') + c.dream + (c.focus || '')).join(),
+          D.heir(S) && D.heir(S).id, f.heir, G.legacy.elders(S).length, D.relatives(S).length, S.legacy.generation].join('|');
+      },
+      build(S) {
+        const D = G.dynasty, f = S.social.family, W = G.work, esc2 = x => esc(x || '');
+        const heir = D.heir(S), kids = D.children(S);
+        let h = `<section class="card"><h3>${esc(D.familyName(S))}</h3>
+          <p>${tr('Sobrenome', 'Surname')} <input data-set="surname" value="${esc2(D.surname(S))}" maxlength="30">
+          ${tr('Seu nome', 'Your name')} <input data-set="myname" value="${esc2(S.me && S.me.name)}" maxlength="30"></p>
+          <p class="muted">${tr(`Geração ${S.legacy.generation}. Você é o líder da família; os anciãos são as gerações que se aposentaram e ainda vivem. Quando um ancião morre, o patrimônio dele vira herança.
+            Cada filho nasce com aptidões (o potencial em cada área) e um sonho de carreira. Escolha o foco da educação (${G.fmt.money(D.FOCUS_COST * S.macro.priceIndex)}/mês por filho):
+            as habilidades crescem até a aptidão. Insistir numa área longe do sonho desgasta a relação; com relação boa, o sonho pode mudar.
+            Escolha o herdeiro: ele assume com a idade real e o que aprendeu (finanças e negócios dão cargo inicial e conhecimento, política dá influência, ciência dá conhecimento, artes dão prestígio).
+            Os outros filhos saem de casa aos ${D.ADULT} anos, seguem carreira e ajudam a família.`,
+            `Generation ${S.legacy.generation}. You are the head of the family; the elders are the generations that retired and are still alive. When an elder dies, their estate becomes an inheritance.
+            Each child is born with aptitudes (their potential in each area) and a dream career. Choose the focus of their education (${G.fmt.money(D.FOCUS_COST * S.macro.priceIndex)}/month per child):
+            skills grow up to the aptitude. Pushing an area far from their dream wears the relationship down; with a good relationship, the dream can change.
+            Choose the heir: they take over at their real age with what they learned (finance and business give a starting position and knowledge, politics gives influence, science gives knowledge, arts give prestige).
+            The other children move out at ${D.ADULT}, pursue careers and help the family.`)}</p></section>`;
+
+        // Líder, cônjuge e anciãos
+        h += `<section class="card"><h3>${tr('Casa', 'Household')}</h3><table class="tbl">
+          <tr><td><b>${esc2(S.me && S.me.name)}</b> <small class="muted">${tr('líder', 'head')}</small></td><td id="dy-me"></td></tr>`;
+        if (f.married) h += `<tr><td>${esc2(f.spouse)} <small class="muted">${tr('cônjuge', 'spouse')}</small></td><td></td></tr>`;
+        G.legacy.elders(S).forEach((e, i) => {
+          h += `<tr><td>${esc2(e.name) || tr(`${e.gen}ª geração`, `Generation ${e.gen}`)} <small class="muted">${tr('ancião', 'elder')}${e.spouse ? ` · ${tr('com', 'with')} ${esc(e.spouse)}` : ''}</small></td><td id="dy-el-${i}"></td></tr>`;
+        });
+        h += '</table></section>';
+
+        // Filhos
+        h += `<section class="card"><h3>${tr('Filhos', 'Children')} <small>${kids.length}</small></h3>`;
+        if (!kids.length) h += `<p class="muted">${tr('Sem filhos ainda. Casamento e filhos ficam na aba Vida → Família.', 'No children yet. Marriage and children are in the Life tab → Family.')}</p>`;
+        const areaOpts = sel => `<option value="">${tr('sem foco', 'no focus')}</option>` + D.AREAS.map(a => `<option value="${a.id}"${a.id === sel ? ' selected' : ''}>${a.n}</option>`).join('');
+        for (const c of kids) {
+          const adult = D.age(S, c) >= D.ADULT;
+          h += `<div class="research"><div><b>${esc(c.name)}</b> <span id="dy-age-${c.id}" class="muted"></span>
+            ${heir && heir.id === c.id ? ` <span class="good">${tr('herdeiro', 'heir')}</span>` : ''}
+            <p class="muted">${tr('Sonho', 'Dream')}: ${D.area(c.dream).career}${adult ? tr(' (seguindo carreira)', ' (pursuing it)') : ''} · ${tr('relação', 'relationship')} <span id="dy-bond-${c.id}"></span></p>
+            <table class="tbl alloc">${D.AREAS.map(a => `<tr><td>${a.n}</td><td id="dy-sk-${c.id}-${a.id}"></td></tr>`).join('')}</table></div>
+            <div class="btns" style="display:block">
+            ${adult ? '' : `<p>${tr('Foco', 'Focus')} <select data-set="focus" data-id="${c.id}">${areaOpts(c.focus)}</select></p>`}
+            <button data-act="kid-time" data-id="${c.id}" id="b-kt-${c.id}">${tr('Passar tempo junto', 'Spend time together')} <small>${D.TIME_ENERGY} ${tr('energia', 'energy')} · ${tr('relação', 'relationship')} +6</small></button>
+            ${heir && heir.id === c.id && f.heir === c.id ? '' : `<button data-act="kid-heir" data-id="${c.id}">${tr('Escolher como herdeiro', 'Choose as heir')}</button>`}
+            </div></div>`;
+        }
+        h += '</section>';
+        if (heir) h += `<section class="card"><h3>${tr('Se', 'If')} ${esc(heir.name)} ${tr('assumisse hoje', 'took over today')}</h3><p id="dy-heir"></p></section>`;
+
+        // Parentes
+        const rel = D.relatives(S);
+        if (rel.length) {
+          h += `<section class="card"><h3>${tr('Parentes', 'Relatives')}</h3><p class="muted">${tr('Irmãos das gerações que lideraram. Seguem a carreira e ajudam a família todo mês.',
+            'Siblings of past heads of the family. They pursue their careers and help the family every month.')}</p><table class="tbl">`;
+          rel.forEach((r, i) => {
+            h += `<tr><td>${esc(r.name)} <small class="muted">${tr(`${r.gen}ª geração`, `generation ${r.gen}`)}</small></td><td>${D.area(r.dream).career}</td><td id="dy-rel-${i}"></td></tr>`;
+          });
+          h += '</table></section>';
+        }
+        return h;
+      },
+      update(S) {
+        const D = G.dynasty, f = G.fmt;
+        set('dy-me', tr(`${Math.floor(G.legacy.age(S))} anos · ${G.work.CAREER[S.job.level].t}`, `age ${Math.floor(G.legacy.age(S))} · ${G.work.CAREER[S.job.level].t}`));
+        G.legacy.elders(S).forEach((e, i) => set(`dy-el-${i}`, tr(`${Math.floor(e.age + (S.day - e.since) / 360)} anos · patrimônio ${f.money(e.estate)}`,
+          `age ${Math.floor(e.age + (S.day - e.since) / 360)} · estate ${f.money(e.estate)}`)));
+        for (const c of D.children(S)) {
+          const age = D.age(S, c);
+          set(`dy-age-${c.id}`, age < 1 ? tr(`${Math.floor(age * 12)} meses`, `${Math.floor(age * 12)} months`) : tr(`${Math.floor(age)} anos`, `age ${Math.floor(age)}`));
+          const b = $(`dy-bond-${c.id}`);
+          if (b) { b.textContent = f.num(c.bond, 0); b.className = c.bond < 30 ? 'bad' : c.bond >= 70 ? 'good' : ''; }
+          for (const a of D.AREAS) {
+            set(`dy-sk-${c.id}-${a.id}`, tr(`${f.num(c.skill[a.id], 0)} de ${f.num(c.apt[a.id], 0)}`, `${f.num(c.skill[a.id], 0)} of ${f.num(c.apt[a.id], 0)}`)
+              + (a.id === c.dream ? ' ★' : '') + (a.id === c.focus ? tr(' · foco', ' · focus') : ''));
+          }
+          dis(`b-kt-${c.id}`, !D.canSpendTime(S, c));
+          why(`b-kt-${c.id}`, S.day < (c.cd || 0) ? tr(`de novo em ${c.cd - S.day} dias`, `available again in ${c.cd - S.day} days`) : need(S, { energy: D.TIME_ENERGY }));
+        }
+        const heir = D.heir(S);
+        if (heir) {
+          const x = D.heirBonus(heir), age = Math.max(18, D.age(S, heir));
+          set('dy-heir', tr(`Assumiria com ${Math.floor(age)} anos como ${G.work.CAREER[x.level].t}, +${f.num(x.knowledge, 0)} de conhecimento, +${f.num(x.reputation, 0)} de reputação, +${f.num(x.influence, 0)} de influência e +${f.num(x.prestige, 0)} de prestígio${x.research.length ? `, com ${new Set(x.research).size} pesquisa(s) feitas` : ''}.${heir.bond < 30 ? ' A relação ruim corta 40% disso.' : ''}`,
+            `Would take over at age ${Math.floor(age)} as ${G.work.CAREER[x.level].t}, +${f.num(x.knowledge, 0)} knowledge, +${f.num(x.reputation, 0)} reputation, +${f.num(x.influence, 0)} influence and +${f.num(x.prestige, 0)} prestige${x.research.length ? `, with ${new Set(x.research).size} research item(s) done` : ''}.${heir.bond < 30 ? ' The poor relationship cuts 40% of that.' : ''}`));
+        }
+        D.relatives(S).forEach((r, i) => set(`dy-rel-${i}`, tr(`${Math.floor((S.day - r.born) / 360)} anos · habilidade ${f.num(r.skill, 0)}`, `age ${Math.floor((S.day - r.born) / 360)} · skill ${f.num(r.skill, 0)}`)));
+      },
+    },
+
     familias: {
       key: S => [G.social.tierIdx(S), G.families.ranking(S).map(r => r.id).join(), G.politics.hasBigMedia(S),
         G.families.FAMILIES.map(fm => G.families.relation(S, fm.id) + (G.families.st(S, fm.id).dossie ? 'd' : '')).join()].join('|'),
@@ -1681,7 +1772,9 @@
             return;
           }
           const fm = FM.byId(r.id), x = FM.st(S, r.id);
-          h += `<tr><td>${i + 1}</td><td><b>${fm.n}</b><br><small class="muted">${FM.sectorName(fm)} · ${P[fm.side].n} · ${fm.d}</small></td>
+          const ld = x.leader;
+          h += `<tr><td>${i + 1}</td><td><b>${fm.n}</b><br><small class="muted">${FM.sectorName(fm)} · ${P[fm.side].n} · ${fm.d}${ld ? ` ${tr(`Líder: ${ld.name}, ${Math.floor(ld.age)} anos, gestão ${ld.skill >= 70 ? 'forte' : ld.skill >= 45 ? 'regular' : 'fraca'}.`,
+            `Head: ${ld.name}, age ${Math.floor(ld.age)}, ${ld.skill >= 70 ? 'strong' : ld.skill >= 45 ? 'average' : 'weak'} management.`)}` : ''}</small></td>
             <td id="fm-w-${fm.id}"></td><td id="fm-r-${fm.id}"></td><td class="ops">
             <button data-act="fam-approach" data-id="${fm.id}" id="b-fa-${fm.id}">${tr('Aproximar', 'Get closer')} <small id="fm-ac-${fm.id}"></small></button>
             ${x.ally ? `<button data-act="fam-break" data-id="${fm.id}">${tr('Romper aliança', 'Break alliance')}</button>`
@@ -1949,7 +2042,7 @@
     const re = G.realty.monthlyNet(S), bz = G.business.monthlyProfit(S), fd = S.fund ? S.fund.lastProfit : 0;
     const loans = re.pmt + G.business.monthlyPayments(S);
     const fam = S.social.family, spouse = fam.married ? fam.spouseIncome * S.macro.priceIndex : 0;
-    const social = spouse - G.social.clubFees(S) - G.social.schoolCost(S) - G.social.partilhaPayment(S);
+    const social = spouse - G.social.clubFees(S) - G.social.schoolCost(S) - G.social.partilhaPayment(S) - G.dynasty.focusCost(S);
     const officePay = (S.pol.office ? G.politics.office(S.pol.office.id).pay * S.macro.priceIndex : 0) + G.nation.pay(S);
     const polCost = G.politics.mediaUpkeep(S) + G.politics.thinkTankCost(S) + G.politics.entityFees(S) - officePay;
     const agro = G.agro.monthlyExpected(S) - G.agro.monthlyCost(S);
@@ -2113,6 +2206,8 @@
         break;
       }
       case 'fam-approach': G.families.approach(S, id); break;
+      case 'kid-time': G.dynasty.spendTime(S, id); break;
+      case 'kid-heir': G.dynasty.setHeir(S, id); break;
       case 'fam-ally': G.families.ally(S, id); break;
       case 'fam-break': G.families.breakAlly(S, id); break;
       case 'fam-inv': G.families.investigate(S, id); break;
@@ -2248,6 +2343,9 @@
     else if (el.dataset.set === 'reserve') S.auto.reserve = Math.max(0, parseFloat(el.value.replace(',', '.')) || 0);
     else if (el.dataset.set === 'robot') S.auto.robot = el.value;
     else if (el.dataset.set === 'routine') S.routine = el.value;
+    else if (el.dataset.set === 'focus') G.dynasty.setFocus(S, el.dataset.id, el.value);
+    else if (el.dataset.set === 'surname') { if (el.value.trim()) S.legacy.surname = el.value.trim().slice(0, 30); }
+    else if (el.dataset.set === 'myname') { if (el.value.trim()) S.me.name = el.value.trim().slice(0, 30); }
     else if (el.dataset.nb) G.nation.setBudget(S, el.dataset.nb, parseFloat(el.value.replace(',', '.')));
     else if (el.dataset.set === 'stance') G.nation.setStance(S, el.value);
     else if (el.dataset.set === 'emendas') G.nation.setEmendas(S, el.value);

@@ -105,9 +105,9 @@
     burnoutMult: S => (has(S, 'exercicio') ? 0.5 : 1) * (1 + S.social.stress / 50),
     costMult(S) {
       const f = S.social.family;
-      return (has(S, 'registrar') ? 0.95 : 1) * (active(S, 'delivery') ? 1.15 : 1) * (f.married ? 1.4 : 1) * (1 + 0.25 * f.kids);
+      return (has(S, 'registrar') ? 0.95 : 1) * (active(S, 'delivery') ? 1.15 : 1) * (f.married ? 1.4 : 1) * (1 + 0.25 * G.dynasty.atHome(S)); // filhos adultos já saíram de casa
     },
-    schoolCost: S => (S.social.family.school ? S.social.family.kids * 4000 * pi(S) : 0),
+    schoolCost: S => (S.social.family.school ? G.dynasty.underSchool(S) * 4000 * pi(S) : 0),
     clubFees: S => CLUBS.reduce((s, c) => s + (S.social.clubs[c.id] ? c.fee * pi(S) : 0), 0),
     gain(S, vis, prest) {
       S.social.visibility += vis * (S.research.oratoria ? 1.3 : 1);
@@ -254,15 +254,16 @@
       S.cash -= cost;
       SO.spent(S, cost);
       f.married = true;
+      f.spouse = G.dynasty.name();
       f.spouseIncome = G.rng.chance(0.3) ? 0 : 3000 * G.rng.range(0.5, 3);
       SO.gain(S, big ? 20 : 2, 1);
       SO.addStress(S, -10);
-      G.news(tr(`Você se casou${big ? ' numa festa que saiu em todas as colunas sociais' : ''}!`, `You got married${big ? ' at a party that made every society column' : ''}!`) +
+      G.news(tr(`Você se casou com ${f.spouse}${big ? ' numa festa que saiu em todas as colunas sociais' : ''}!`, `You married ${f.spouse}${big ? ' at a party that made every society column' : ''}!`) +
         (f.spouseIncome ? tr(` A renda do casal cresce ${money(f.spouseIncome * pi(S))}/mês.`, ` Household income grows by ${money(f.spouseIncome * pi(S))}/month.`) : ''), 'good');
       G.work.checkRoom(S);
     },
     // 'trying' (tentando engravidar), 'pregnant', 'recovering' (depois do parto) ou 'ready'.
-    familySize: S => 1 + (S.social.family.married ? 1 : 0) + S.social.family.kids,
+    familySize: S => 1 + (S.social.family.married ? 1 : 0) + G.dynasty.atHome(S),
     kidState(S) {
       const f = S.social.family;
       return f.pregnant ? 'pregnant' : f.trying ? 'trying' : S.day < (f.nextKid || 0) ? 'recovering' : 'ready';
@@ -282,10 +283,12 @@
       if (f.pregnant) {
         if (S.day < f.pregnant.due) return;
         f.pregnant = null;
+        const child = G.dynasty.newChild(S);
+        G.dynasty.children(S).push(child);
         f.kids++;
         f.nextKid = S.day + RECOVERY;
-        G.news(tr(`Nasceu seu ${f.kids}º filho! O custo de vida sobe, mas agora existe um herdeiro.`,
-          `Your child #${f.kids} is born! The cost of living goes up, but now there is an heir.`), 'good');
+        G.news(tr(`Nasceu ${child.name}, seu ${f.kids}º filho! Talento para ${G.dynasty.area(child.dream).n.toLowerCase()}. O custo de vida sobe, mas agora existe um herdeiro.`,
+          `${child.name}, your child #${f.kids}, is born! A gift for ${G.dynasty.area(child.dream).n.toLowerCase()}. The cost of living goes up, but now there is an heir.`), 'good');
         G.work.checkRoom(S);
       } else if (f.trying && G.rng.chance(CONCEIVE)) {
         f.trying = false;
@@ -303,7 +306,7 @@
       const later = 0.4 * Math.max(0, other);
       S.cash -= now;
       if (later > 0) f.partilha = { bal: later + (f.partilha ? f.partilha.bal : 0), left: 24 };
-      Object.assign(f, { married: false, spouseIncome: 0, trying: false });
+      Object.assign(f, { married: false, spouseIncome: 0, trying: false, spouse: null });
       SO.addStress(S, 25);
       G.alert(S, tr(`Divórcio. A partilha levou ${money(now)} na hora`, `Divorce. The settlement took ${money(now)} right away`) +
         (later > 0 ? tr(` e mais ${money(later)} pelos outros bens, em 24 parcelas.`, ` plus ${money(later)} for the other assets, in 24 installments.`) : '.'), 'bad');
@@ -330,7 +333,7 @@
         S.reputation += c.rep || 0;
         if (c.stress) SO.addStress(S, c.stress);
       }
-      if (f.school) SO.gain(S, 0, 0.2 * f.kids);
+      if (f.school) SO.gain(S, 0, 0.2 * G.dynasty.underSchool(S));
 
       // Prestígio passivo: carreira, empresas, gestora
       if (S.job.employed) SO.gain(S, 0, 0.1 * S.job.level);

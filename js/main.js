@@ -28,6 +28,7 @@
       G.fund.monthly(S);
       G.work.monthly(S, c);
       G.social.monthly(S);
+      G.dynasty.monthly(S);
       G.life.monthly(S, c);
       G.choices.monthly(S);
       G.politics.monthly(S, c);
@@ -72,6 +73,8 @@
       'With your career moving, your social life starts to matter. New tab: Life.'));
     if (G.social.tierIdx(S) >= 2) open('poder', tr('Seu nome começa a circular em Brasília. Nova aba: Poder.', 'Your name starts making the rounds in Brasília. New tab: Power.'));
     if (S.research.agro) open('terras', tr('Você começou a visitar fazendas à venda. Nova aba: Terras.', 'You started visiting farms for sale. New tab: Land.'));
+    if (S.tabs.vida) open('dinastia', tr(`Nova aba: Dinastia, a ${G.dynasty.familyName(S)} (você, cônjuge, filhos, anciãos e parentes).`,
+      `New tab: Dynasty, ${G.dynasty.familyName(S)} (you, spouse, children, elders and relatives).`));
     if (S.tabs.vida) open('lazer', tr('Tempo livre também conta. Nova aba: Lazer (férias, hobbies, saúde e coleções).',
       'Free time counts too. New tab: Leisure (vacations, hobbies, health and collections).'));
     if (S.research.anjo || S.angel.tickets.length) open('startups', tr('Um amigo te chamou para um grupo de investidores-anjo. Nova aba: Startups.',

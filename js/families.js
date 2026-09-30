@@ -36,6 +36,9 @@
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const pi = S => S.macro.priceIndex;
   const byId = id => FAMILIES.find(f => f.id === id);
+  // Líder de cada família: envelhece, morre e é substituído; a competência pesa no crescimento da fortuna.
+  const newLeader = (f, young) => ({ name: `${G.dynasty.name()} ${f.n.split(' ')[0]}`, age: young ? G.rng.int(35, 55) : G.rng.int(50, 78),
+    skill: G.rng.int(20, 95), dies: G.rng.int(78, 95) });
 
   const F = G.families = {
     FAMILIES, MAX_ALLIES,
@@ -45,7 +48,7 @@
       const list = {};
       for (const f of FAMILIES) {
         list[f.id] = { w: f.w0 * (S.macro ? S.macro.priceIndex : 1), px: S.market ? S.market.prices[f.sector] : 100, px12: [], att: 0, ally: false, cd: 0,
-          watch: 0, dossie: false, hot: 0 };
+          watch: 0, dossie: false, hot: 0, leader: newLeader(f, false) };
       }
       return { list, priceWar: null, noticed: false };
     },
@@ -62,7 +65,7 @@
     // Ranking com a sua família no meio. Devolve [{ id, n, w, you }] do mais rico ao menos rico.
     ranking(S) {
       const rows = FAMILIES.map(f => ({ id: f.id, n: f.n, w: S.fam.list[f.id].w }));
-      rows.push({ id: 'voce', n: tr('Sua família', 'Your family'), w: Math.max(0, G.portfolio.netWorth(S)), you: true });
+      rows.push({ id: 'voce', n: G.dynasty.familyName(S), w: Math.max(0, G.portfolio.netWorth(S)), you: true });
       return rows.sort((a, b) => b.w - a.w);
     },
     myRank: S => F.ranking(S).findIndex(r => r.you) + 1,
@@ -227,7 +230,15 @@
         // Patrimônio: 60% do retorno do setor + reinvestimento (~5% a.a.) + ruído + governo amigo.
         const r = px[f.sector] / (x.px || px[f.sector]) - 1;
         x.px = px[f.sector];
-        let g = 0.6 * r + 0.004 + G.rng.normal() * 0.012 + (gov === f.side ? 0.002 : 0);
+        const ld = x.leader || (x.leader = newLeader(f, false));
+        ld.age += 1 / 12;
+        if (ld.age >= ld.dies) {
+          const old = ld.name;
+          x.leader = newLeader(f, true);
+          if (fam.noticed) G.news(tr(`Morreu ${old}, líder da família ${f.n}. ${x.leader.name}, de ${Math.floor(x.leader.age)} anos, assume o comando.`,
+            `${old}, head of the ${f.n} family, has died. ${x.leader.name}, age ${Math.floor(x.leader.age)}, takes the helm.`), 'info');
+        }
+        let g = 0.6 * r + 0.004 + G.rng.normal() * 0.012 + (gov === f.side ? 0.002 : 0) + (x.leader.skill - 55) / 45 * 0.002;
         if (G.rng.chance(0.003)) {
           g -= 0.2;
           G.news(tr(`Escândalo derruba o patrimônio da família ${f.n}.`, `A scandal knocks down the ${f.n} family fortune.`), 'info');

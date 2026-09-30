@@ -2,7 +2,7 @@
   const G = globalThis.G = globalThis.G || {};
 
   const KEY = 'juros-compostos-save';
-  const VERSION = 11;
+  const VERSION = 12;
 
   G.newState = function (seed = (Date.now() ^ Math.floor(Math.random() * 1e9)) | 0) {
     const S = {
@@ -19,6 +19,9 @@
       lastSeen: Date.now(),
     };
     G.S = S; // o rng lê o estado daqui
+    S.legacy.surname = G.rng.item(G.dynasty.SURNAMES);
+    S.me = { name: G.dynasty.name() };
+    S.ageOffset = 0;
     S.lifespan = S.baseLifespan = G.legacy.rollLifespan(S);
     G.macro.init(S);
     G.market.init(S);
@@ -106,6 +109,14 @@
       S.fam = G.families.init(S);
       S.nation = G.nation.init();
       S.v = 11;
+    }
+    if (S.v < 12) { // dinastia: nomes, filhos com aptidões, herdeiro escolhido
+      G.S = S;
+      if (!S.legacy.surname) S.legacy.surname = G.rng.item(G.dynasty.SURNAMES);
+      if (!S.me) S.me = { name: G.dynasty.name() };
+      if (S.social.family.married && !S.social.family.spouse) S.social.family.spouse = G.dynasty.name();
+      G.dynasty.children(S);
+      S.v = 12;
     }
     if (!S.routine) S.routine = 'off';
     if (!S.biz.loans) S.biz.loans = [];

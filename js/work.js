@@ -264,7 +264,8 @@
       const PL = G.politics;
       const re = G.realty.monthlyNet(S);
       return W.cost(S) + re.pmt + re.upkeep + G.business.monthlyPayments(S) + G.social.clubFees(S) + G.social.schoolCost(S)
-        + PL.mediaUpkeep(S) + PL.thinkTankCost(S) + PL.entityFees(S) + G.social.partilhaPayment(S) + G.agro.monthlyCost(S) + G.life.monthlyCost(S);
+        + PL.mediaUpkeep(S) + PL.thinkTankCost(S) + PL.entityFees(S) + G.social.partilhaPayment(S) + G.agro.monthlyCost(S) + G.life.monthlyCost(S)
+        + G.dynasty.focusCost(S);
     },
 
     // Fecha o mês depois de todas as cobranças: resgata a reserva líquida, depois vende o resto da carteira

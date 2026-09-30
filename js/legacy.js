@@ -86,7 +86,8 @@
     UPGRADES, ACHIEVEMENTS, HEIR_AGE, ADVANCE,
     init: () => ({ lp: 0, up: {}, generation: 1, history: [], ach: {}, elders: [] }),
     level: (S, id) => S.legacy.up[id] || 0,
-    age: S => START_AGE + (S.day - S.birthDay) / 360,
+    // ageOffset: o herdeiro assume com a idade real dele (0 = 22 anos no dia em que assumiu).
+    age: S => START_AGE + (S.ageOffset || 0) + (S.day - S.birthDay) / 360,
     rollLifespan: S => START_AGE + G.rng.int(56, 70),
     lifespan: S => S.lifespan + 3 * LG.level(S, 'longevidade'),
     health(S) {
@@ -137,14 +138,14 @@
       const hand = LG.handover(S, reason), inheritance = hand.now;
       if (hand.kept > 0) {
         LG.elders(S).push({
-          gen: L.generation, age: LG.age(S), since: S.day, estate: hand.kept,
+          gen: L.generation, name: S.me ? S.me.name : '', spouse: S.social.family.married ? S.social.family.spouse : null, age: LG.age(S), since: S.day, estate: hand.kept,
           dies: S.day + Math.max(30, Math.round((LG.lifespan(S) - LG.age(S)) * 360)),
           cost: (G.work.cost(S) / S.macro.priceIndex) * ELDER_COST,
         });
       }
       L.lp += gained;
       L.history.push({
-        gen: L.generation, from: G.cal.of(S.birthDay).year, to: G.cal.of(S.day).year, age: Math.floor(LG.age(S)),
+        gen: L.generation, name: S.me ? S.me.name : '', from: G.cal.of(S.birthDay).year, to: G.cal.of(S.day).year, age: Math.floor(LG.age(S)),
         nw: real(S), lp: gained, reason,
       });
       if (S.nation && S.nation.president) {
@@ -160,8 +161,16 @@
       next.routine = S.routine;
       next.settings = S.settings;
       next.legacy = L;
+      // O herdeiro escolhido (aba Dinastia) assume com a idade real e o que aprendeu; os irmãos viram parentes.
+      const heir = heirs ? G.dynasty.heir(S) : null;
+      if (heir) {
+        G.dynasty.passOn(S, heir);
+        next.me = { name: heir.name };
+        next.ageOffset = Math.max(18, G.dynasty.age(S, heir)) - START_AGE;
+        G.dynasty.applyHeir(next, heir);
+      }
       L.generation++;
-      next.lifespan = next.baseLifespan = LG.rollLifespan(next);
+      next.lifespan = next.baseLifespan = Math.max(LG.rollLifespan(next), LG.age(next) + 10);
       next.job.wageIndex = S.macro.priceIndex;
       next.cash = 300 * S.macro.priceIndex + inheritance;
       next.social.prestige = S.social.prestige * SURNAME[LG.level(S, 'sobrenome')];
@@ -191,8 +200,9 @@
           tr('A geração aposentada vive disso até morrer; o que sobrar vira herança, menos 8% de ITCMD.',
             'The retired generation lives on it until death; whatever is left becomes an inheritance, minus 8% inheritance tax.')] : []),
         [tr('Conquistas desta vida', 'Achievements this life'), got.length ? got.join(', ') : tr('nenhuma', 'none')],
-        tr(`Começa a geração ${L.generation}: seu herdeiro tem 22 anos e começa como estagiário, no mesmo mundo.`,
-          `Generation ${L.generation} begins: your heir is 22 and starts as an intern, in the same world.`),
+        heir ? tr(`Começa a geração ${L.generation}: ${heir.name}, com ${Math.floor(LG.age(next))} anos, assume como ${G.work.CAREER[next.job.level].t}, no mesmo mundo.`,
+          `Generation ${L.generation} begins: ${heir.name}, age ${Math.floor(LG.age(next))}, takes over as ${G.work.CAREER[next.job.level].t}, in the same world.`)
+          : tr(`Começa a geração ${L.generation} com um parente distante, de 22 anos, como estagiário.`, `Generation ${L.generation} begins with a distant relative, age 22, as an intern.`),
       ]);
       if (G.ui && G.ui.reset) G.ui.reset();
       return next;
