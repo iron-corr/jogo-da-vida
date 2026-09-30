@@ -1,15 +1,21 @@
 (function () {
   const G = globalThis.G = globalThis.G || {};
+  const tr = G.L;
 
   // Investimento-anjo (retorno médio ~2,3x em 6-7 anos). O destino de cada startup é sorteado quando a rodada aparece;
   // o jogador só vê um sinal de tração, que é confiável na proporção da due diligence.
   const PREFIX = ['Agro', 'Pix', 'Log', 'Saúde', 'Edu', 'Pet', 'Casa', 'Frota', 'Nuvem', 'Pay', 'Food', 'Clima', 'Obra', 'Seguro'];
   const SUFFIX = ['ly', 'io', 'Hub', 'Tech', 'Bank', 'Go', 'Now', 'AI', 'Up', 'Lab', 'Flow', 'Box'];
-  const PITCH = [
+  const PITCH = tr([
     'marketplace de', 'app para', 'SaaS para gestão de', 'fintech de crédito para', 'plataforma de dados sobre', 'IA que automatiza',
-  ];
-  const TOPIC = ['pequenos produtores', 'clínicas veterinárias', 'condomínios', 'frotas de caminhão', 'escolas', 'obras', 'restaurantes', 'corretores'];
+  ], [
+    'marketplace for', 'app for', 'management SaaS for', 'credit fintech for', 'data platform for', 'AI that automates',
+  ]);
+  const TOPIC = tr(['pequenos produtores', 'clínicas veterinárias', 'condomínios', 'frotas de caminhão', 'escolas', 'obras', 'restaurantes', 'corretores'],
+    ['small farmers', 'veterinary clinics', 'apartment buildings', 'truck fleets', 'schools', 'construction sites', 'restaurants', 'real estate brokers']);
   const SIGNALS = ['fraca', 'média', 'forte'];
+  // O sinal fica salvo como chave em português; este é o nome exibido.
+  const SIGNAL_NAMES = { fraca: tr('fraca', 'weak'), média: tr('média', 'moderate'), forte: tr('forte', 'strong') };
   const DEALS = 3;
   const DEAL_DAYS = 90;
   const money = v => G.fmt.money(v);
@@ -37,6 +43,7 @@
   }
 
   const A = G.angel = {
+    SIGNAL_NAMES,
     fate,
     newName: () => G.rng.item(PREFIX) + G.rng.item(SUFFIX),
     book: S => S.angel.tickets.reduce((s, t) => s + t.amount, 0),
@@ -46,7 +53,7 @@
       S.cash -= d.ticket;
       S.angel.deals.splice(i, 1);
       S.angel.tickets.push({ name: d.name, amount: d.ticket, day: S.day, exitDay: S.day + d.exit, mult: d.mult });
-      G.news(`Você investiu ${money(d.ticket)} na ${d.name}. Agora é esperar anos.`, 'info');
+      G.news(tr(`Você investiu ${money(d.ticket)} na ${d.name}. Agora é esperar anos.`, `You invested ${money(d.ticket)} in ${d.name}. Now you wait for years.`), 'info');
     },
     monthly(S) {
       const a = S.angel;
@@ -62,10 +69,14 @@
         const net = payout - G.tax.flat(S, payout - t.amount);
         S.cash += net;
         S.stats.angelOut = (S.stats.angelOut || 0) + net;
-        if (t.mult === 0) G.news(`A ${t.name} fechou as portas. Os ${money(t.amount)} investidos viraram experiência.`, 'bad');
-        else if (t.mult < 1) G.news(`A ${t.name} foi vendida por pouco. Você recuperou ${money(net)} de ${money(t.amount)}.`, 'bad');
-        else if (t.mult < 30) G.news(`A ${t.name} foi comprada! Seu cheque de ${money(t.amount)} virou ${money(net)}.`, 'good');
-        else G.legacy.flag(S, 'unicornio'), G.news(`UNICÓRNIO: a ${t.name} abriu capital em Nova York. Seu cheque de ${money(t.amount)} virou ${money(net)}.`, 'good');
+        if (t.mult === 0) G.news(tr(`A ${t.name} fechou as portas. Os ${money(t.amount)} investidos viraram experiência.`,
+          `${t.name} shut down. The ${money(t.amount)} invested became a learning experience.`), 'bad');
+        else if (t.mult < 1) G.news(tr(`A ${t.name} foi vendida por pouco. Você recuperou ${money(net)} de ${money(t.amount)}.`,
+          `${t.name} was sold for little. You got back ${money(net)} of ${money(t.amount)}.`), 'bad');
+        else if (t.mult < 30) G.news(tr(`A ${t.name} foi comprada! Seu cheque de ${money(t.amount)} virou ${money(net)}.`,
+          `${t.name} was acquired! Your ${money(t.amount)} check turned into ${money(net)}.`), 'good');
+        else G.legacy.flag(S, 'unicornio'), G.news(tr(`UNICÓRNIO: a ${t.name} abriu capital em Nova York. Seu cheque de ${money(t.amount)} virou ${money(net)}.`,
+          `UNICORN: ${t.name} went public in New York. Your ${money(t.amount)} check turned into ${money(net)}.`), 'good');
       }
     },
   };

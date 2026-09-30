@@ -1,9 +1,15 @@
 (function () {
   const G = globalThis.G = globalThis.G || {};
 
-  const SUFFIXES = [[1e18, ' qui'], [1e15, ' quatri'], [1e12, ' tri'], [1e9, ' bi'], [1e6, ' mi']];
-  const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-  const nf = (v, d) => v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const EN = G.EN;
+  const SUFFIXES = EN
+    ? [[1e18, ' Qi'], [1e15, ' Qa'], [1e12, ' T'], [1e9, ' B'], [1e6, ' M']]
+    : [[1e18, ' qui'], [1e15, ' quatri'], [1e12, ' tri'], [1e9, ' bi'], [1e6, ' mi']];
+  const MESES = EN
+    ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    : ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  const LOCALE = EN ? 'en-US' : 'pt-BR';
+  const nf = (v, d) => v.toLocaleString(LOCALE, { minimumFractionDigits: d, maximumFractionDigits: d });
 
   G.fmt = {
     MESES,

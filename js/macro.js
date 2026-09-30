@@ -1,38 +1,46 @@
 (function () {
   const G = globalThis.G = globalThis.G || {};
+  const tr = G.L;
 
   // Cadeia de Markov de regimes. Cada regime puxa Selic e inflação para um alvo;
   // a duração é sorteada ao entrar nele.
   const REGIMES = {
     expansao: {
-      n: 'Expansão', selic: 0.105, infl: 0.045, dur: [720, 1800], next: { pico: 0.8, recessao: 0.2 }, layoff: 0.004,
-      head: ['PIB cresce acima do esperado', 'Desemprego cai ao menor nível em anos', 'Crédito farto e confiança em alta'],
+      n: tr('Expansão', 'Expansion'), selic: 0.105, infl: 0.045, dur: [720, 1800], next: { pico: 0.8, recessao: 0.2 }, layoff: 0.004,
+      head: tr(['PIB cresce acima do esperado', 'Desemprego cai ao menor nível em anos', 'Crédito farto e confiança em alta'],
+        ['GDP grows faster than expected', 'Unemployment falls to its lowest in years', 'Easy credit and confidence on the rise']),
     },
     pico: {
-      n: 'Pico', selic: 0.1375, infl: 0.075, dur: [180, 540], next: { recessao: 1 }, layoff: 0.005,
-      head: ['Inflação estoura o teto da meta', '"Dessa vez é diferente", dizem analistas', 'Fila de IPOs na B3'],
+      n: tr('Pico', 'Peak'), selic: 0.1375, infl: 0.075, dur: [180, 540], next: { recessao: 1 }, layoff: 0.005,
+      head: tr(['Inflação estoura o teto da meta', '"Dessa vez é diferente", dizem analistas', 'Fila de IPOs na B3'],
+        ['Inflation breaks through the target ceiling', '"This time is different," analysts say', 'IPOs line up on the B3 exchange']),
     },
     recessao: {
-      n: 'Recessão', selic: 0.085, infl: 0.05, dur: [270, 630], next: { recuperacao: 1 }, layoff: 0.03,
-      head: ['PIB recua pelo segundo trimestre seguido', 'Onda de demissões atinge vários setores', 'Inadimplência dispara'],
+      n: tr('Recessão', 'Recession'), selic: 0.085, infl: 0.05, dur: [270, 630], next: { recuperacao: 1 }, layoff: 0.03,
+      head: tr(['PIB recua pelo segundo trimestre seguido', 'Onda de demissões atinge vários setores', 'Inadimplência dispara'],
+        ['GDP shrinks for the second quarter in a row', 'Wave of layoffs hits several sectors', 'Loan defaults soar']),
     },
     recuperacao: {
-      n: 'Recuperação', selic: 0.07, infl: 0.035, dur: [360, 900], next: { expansao: 1 }, layoff: 0.01,
-      head: ['Economia dá sinais de melhora', 'Confiança do consumidor volta a subir', 'Indústria retoma contratações'],
+      n: tr('Recuperação', 'Recovery'), selic: 0.07, infl: 0.035, dur: [360, 900], next: { expansao: 1 }, layoff: 0.01,
+      head: tr(['Economia dá sinais de melhora', 'Confiança do consumidor volta a subir', 'Indústria retoma contratações'],
+        ['Economy shows signs of improvement', 'Consumer confidence picks up again', 'Industry resumes hiring']),
     },
   };
 
   // Plataformas de governo (partidos fictícios), definidas nas eleições; ver politics.js.
   // weight = chance base de vencer; alpha = retorno extra (a.a.) por setor durante o mandato.
   const POLICIES = {
-    moderado: { n: 'Moderado', selic: 0, infl: 0, weight: 0.45, alpha: {},
-      d: 'Continuidade. Sem grandes mudanças.' },
-    austero: { n: 'Austero', selic: -0.01, infl: -0.005, weight: 0.2, alpha: { bancos: 0.03, utilities: 0.02, varejo: -0.03 },
-      d: 'Corte de gastos: juros e inflação menores, bancos e energia ganham, varejo sofre.' },
-    expansionista: { n: 'Expansionista', selic: 0.015, infl: 0.015, weight: 0.25, alpha: { varejo: 0.05, commodities: 0.02, bancos: -0.02, imob: 0.02 },
-      d: 'Gasto público e crédito farto: consumo e imóveis sobem, mas juros e inflação também.' },
-    redistributivo: { n: 'Redistributivo', selic: 0.01, infl: 0.01, weight: 0.1, alpha: { bancos: -0.05, tech: -0.03, varejo: 0.03 },
-      d: 'Imposto de 1% ao ano sobre fortunas acima de R$ 10 mi, 15% sobre todos os dividendos e revogação de isenções. Cresce quando os ricos têm má imagem.' },
+    moderado: { n: tr('Moderado', 'Moderate'), selic: 0, infl: 0, weight: 0.45, alpha: {},
+      d: tr('Continuidade. Sem grandes mudanças.', 'Continuity. No big changes.') },
+    austero: { n: tr('Austero', 'Austere'), selic: -0.01, infl: -0.005, weight: 0.2, alpha: { bancos: 0.03, utilities: 0.02, varejo: -0.03 },
+      d: tr('Corte de gastos: juros e inflação menores, bancos e energia ganham, varejo sofre.',
+        'Spending cuts: lower rates and inflation, banks and utilities win, retail suffers.') },
+    expansionista: { n: tr('Expansionista', 'Expansionist'), selic: 0.015, infl: 0.015, weight: 0.25, alpha: { varejo: 0.05, commodities: 0.02, bancos: -0.02, imob: 0.02 },
+      d: tr('Gasto público e crédito farto: consumo e imóveis sobem, mas juros e inflação também.',
+        'Public spending and easy credit: consumption and real estate rise, but so do rates and inflation.') },
+    redistributivo: { n: tr('Redistributivo', 'Redistributive'), selic: 0.01, infl: 0.01, weight: 0.1, alpha: { bancos: -0.05, tech: -0.03, varejo: 0.03 },
+      d: tr('Imposto de 1% ao ano sobre fortunas acima de R$ 10 mi, 15% sobre todos os dividendos e revogação de isenções. Cresce quando os ricos têm má imagem.',
+        'A 1% yearly tax on fortunes above R$ 10M, 15% on all dividends and repeal of exemptions. Gains ground when the rich have a bad image.') },
   };
 
   // Indicadores: PMI antecipa a próxima fase, desemprego anda atrasado.
@@ -41,10 +49,10 @@
   const LEAD_DAYS = 120;
   const HINT_DAYS = 60;
   const HINTS = {
-    expansao: 'a retomada vai virar crescimento de verdade',
-    pico: 'a economia está superaquecendo, e isso não dura',
-    recessao: 'as empresas estão cortando investimentos; vem recessão aí',
-    recuperacao: 'o pior já passou; a economia vai voltar a respirar',
+    expansao: tr('a retomada vai virar crescimento de verdade', 'the rebound is about to turn into real growth'),
+    pico: tr('a economia está superaquecendo, e isso não dura', 'the economy is overheating, and that never lasts'),
+    recessao: tr('as empresas estão cortando investimentos; vem recessão aí', 'companies are cutting investment; a recession is coming'),
+    recuperacao: tr('o pior já passou; a economia vai voltar a respirar', 'the worst is over; the economy is about to breathe again'),
   };
 
   const COPOM_EVERY = 45;
@@ -66,8 +74,10 @@
     m.nextCopom = S.day + COPOM_EVERY;
     m.selicHist.push(m.selic);
     if (m.selicHist.length > 120) m.selicHist.shift();
-    const verb = m.selic > old + 1e-9 ? 'eleva' : m.selic < old - 1e-9 ? 'corta' : 'mantém';
-    G.news(`Copom ${verb} a Selic ${verb === 'mantém' ? 'em' : 'para'} ${G.fmt.pct(m.selic)}.`, 'macro');
+    const dir = m.selic > old + 1e-9 ? 1 : m.selic < old - 1e-9 ? -1 : 0;
+    const verb = dir > 0 ? tr('eleva', 'raises') : dir < 0 ? tr('corta', 'cuts') : tr('mantém', 'holds');
+    G.news(tr(`Copom ${verb} a Selic ${dir ? 'para' : 'em'} ${G.fmt.pct(m.selic)}.`,
+      `Copom ${verb} the Selic rate ${dir ? 'to' : 'at'} ${G.fmt.pct(m.selic)}.`), 'macro');
   }
 
   // Leitura (ruidosa) do regime. Sem pesquisa, o jogador não vê o ciclo.
@@ -125,12 +135,12 @@
         m.next = G.rng.pick(REGIMES[m.regime].next);
         const r = REGIMES[m.regime];
         m.daysLeft = G.rng.int(r.dur[0], r.dur[1]);
-        G.news(`Manchete: "${G.rng.item(r.head)}"`, 'macro');
+        G.news(`${tr('Manchete', 'Headline')}: "${G.rng.item(r.head)}"`, 'macro');
         G.events.onRegime(S, from, m.regime);
       }
       if (m.daysLeft === HINT_DAYS && S.research.networking) {
         const guess = G.rng.chance(0.7) ? m.next : G.rng.item(Object.keys(REGIMES).filter(k => k !== m.regime));
-        G.news(`Seus contatos no mercado comentam: ${HINTS[guess]}.`, 'hint');
+        G.news(tr(`Seus contatos no mercado comentam: ${HINTS[guess]}.`, `Your market contacts are saying: ${HINTS[guess]}.`), 'hint');
       }
       indicators(S);
       const t = target(S);
@@ -145,10 +155,10 @@
       // Manchetes soltas são um sinal fraco: 70% vêm do regime real.
       if (G.rng.chance(0.15)) {
         const r = G.rng.chance(0.7) ? REGIMES[m.regime] : REGIMES[G.rng.item(Object.keys(REGIMES))];
-        G.news(`Manchete: "${G.rng.item(r.head)}"`, 'macro');
+        G.news(`${tr('Manchete', 'Headline')}: "${G.rng.item(r.head)}"`, 'macro');
       }
       if (G.cal.isElectionYear(c.year)) {
-        if (c.month === 8) G.news('Começa a campanha eleitoral. O mercado fica nervoso a cada pesquisa.', 'politica');
+        if (c.month === 8) G.news(tr('Começa a campanha eleitoral. O mercado fica nervoso a cada pesquisa.', 'The election campaign begins. The market gets nervous with every poll.'), 'politica');
         if (c.month === 11) G.politics.runElection(S);
       }
     },

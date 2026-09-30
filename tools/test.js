@@ -2,7 +2,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const root = path.join(__dirname, '..');
 const ctx = vm.createContext({ console });
-for (const f of ['rng', 'format', 'calendar', 'data/assets', 'events', 'tax', 'portfolio', 'realty', 'agro', 'angel', 'automation', 'business', 'fund', 'social', 'politics', 'legacy', 'life', 'choices', 'work', 'macro', 'market', 'state'])
+for (const f of ['i18n', 'rng', 'format', 'calendar', 'data/assets', 'events', 'tax', 'portfolio', 'realty', 'agro', 'angel', 'automation', 'business', 'fund', 'social', 'politics', 'legacy', 'life', 'choices', 'work', 'macro', 'market', 'state'])
   vm.runInContext(fs.readFileSync(path.join(root, 'js', f + '.js'), 'utf8'), ctx);
 const G = ctx.G;
 let ok = true;
@@ -164,10 +164,33 @@ G.social.decide(S, true);
 eq('pânico vendeu a bolsa', G.portfolio.value(S, 'ibov'), 0);
 eq('pânico manteve o Tesouro', G.portfolio.value(S, 'tesouro_selic'), 10000);
 
-// 23) família: casar +40% e cada filho +25% no custo de vida
+// 23) família: casar +40% e cada filho +25% no custo de vida; o filho só nasce depois de engravidar e 9 meses de gravidez
 S = G.newState(23); const base23 = G.work.cost(S); S.cash = 1e6;
 G.social.marry(S, false); G.social.haveKid(S);
+eq('filho não nasce na hora', S.social.family.kids, 0);
+const cash23 = S.cash; G.social.haveKid(S);
+eq('não dá para tentar dois ao mesmo tempo', cash23 - S.cash, 0);
+let m23 = 0;
+while (!S.social.family.pregnant && m23 < 120) { S.day += 30; G.social.kidMonthly(S); m23++; }
+const due23 = S.social.family.pregnant.due, conceived23 = S.day;
+eq('gravidez de 9 meses', due23 - conceived23, 270);
+G.social.haveKid(S); eq('grávida não começa outro', S.social.family.pregnant.due, due23);
+while (S.day < due23 - 30) { S.day += 30; G.social.kidMonthly(S); }
+eq('ainda não nasceu no 8º mês', S.social.family.kids, 0);
+S.day += 30; G.social.kidMonthly(S);
+eq('nasceu depois de 9 meses', S.social.family.kids, 1);
 eq('custo casado com 1 filho', G.work.cost(S) / base23, 1.4 * 1.25);
+eq('recuperação depois do parto', G.social.kidState(S) === 'recovering' ? 1 : 0, 1);
+S.day += 360; eq('pode tentar de novo depois de 1 ano', G.social.kidState(S) === 'ready' ? 1 : 0, 1);
+
+// 23b) palestra paga: no máximo uma a cada 5 dias
+S = G.newState(231); S.research.oratoria = true; S.social.prestige = 500; S.energy = 1000; S.burnout = 0;
+let cash23b = S.cash; G.social.doActivity(S, 'palestra');
+eq('palestra paga cachê', S.cash > cash23b ? 1 : 0, 1);
+cash23b = S.cash; S.day += 4; G.social.doActivity(S, 'palestra');
+eq('sem palestra antes de 5 dias', S.cash - cash23b, 0);
+S.day += 1; G.social.doActivity(S, 'palestra');
+eq('palestra liberada no 5º dia', S.cash > cash23b ? 1 : 0, 1);
 
 // 24) doação: prestígio cresce com a raiz do valor doado
 S = G.newState(24); S.cash = 1e6; G.social.donate(S, 100000);

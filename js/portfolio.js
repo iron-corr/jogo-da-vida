@@ -1,5 +1,6 @@
 (function () {
   const G = globalThis.G = globalThis.G || {};
+  const tr = G.L;
 
   // Cada posição é uma lista de lotes { u: cotas, c: custo, d: dia da compra }.
   // Lotes permitem carência por aplicação (CDB) e, no M3, IR por lote.
@@ -77,7 +78,8 @@
         if (S.settings.reinvest && S.research.dividendos) P.buy(S, id, amount);
       }
       if (total >= 0.01) {
-        G.news(`Dividendos e aluguéis: ${G.fmt.money(total)}${S.settings.reinvest && S.research.dividendos ? ' (reinvestidos)' : ''}.`, 'good');
+        G.news(tr(`Dividendos e aluguéis: ${G.fmt.money(total)}${S.settings.reinvest && S.research.dividendos ? ' (reinvestidos)' : ''}.`,
+          `Dividends and rents: ${G.fmt.money(total)}${S.settings.reinvest && S.research.dividendos ? ' (reinvested)' : ''}.`), 'good');
       }
     },
   };

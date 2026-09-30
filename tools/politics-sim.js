@@ -16,7 +16,7 @@ const ctx = vm.createContext({
   window: { addEventListener: noop }, document: { addEventListener: noop },
 });
 const JS = path.join(__dirname, '..', 'js');
-const FILES = ['rng', 'format', 'calendar', 'data/assets', 'data/research', 'macro', 'market', 'events', 'tax', 'portfolio',
+const FILES = ['i18n', 'rng', 'format', 'calendar', 'data/assets', 'data/research', 'macro', 'market', 'events', 'tax', 'portfolio',
   'realty', 'agro', 'angel', 'automation', 'business', 'fund', 'social', 'politics', 'legacy', 'life', 'choices', 'work', 'research', 'state'];
 for (const f of FILES)
   vm.runInContext(fs.readFileSync(path.join(JS, f + '.js'), 'utf8'), ctx);

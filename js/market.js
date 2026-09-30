@@ -1,5 +1,6 @@
 (function () {
   const G = globalThis.G = globalThis.G || {};
+  const tr = G.L;
 
   const HIST = 720;
   const SQ = Math.sqrt(360);
@@ -23,11 +24,11 @@
   // Cada fase tem um drift (log, a.a.); a amplitude encolhe a cada ciclo (mercado amadurece).
   const HALVING0 = 810, CYCLE = 1440;
   const CRYPTO_PHASES = [
-    [0.12, 0.4, 'pós-halving'],
-    [0.4, 1.6, 'euforia'],
-    [0.5, -2.5, 'estouro da bolha'],
-    [0.75, -0.4, 'inverno cripto'],
-    [1, 0.2, 'acumulação'],
+    [0.12, 0.4, tr('pós-halving', 'post-halving')],
+    [0.4, 1.6, tr('euforia', 'euphoria')],
+    [0.5, -2.5, tr('estouro da bolha', 'bubble burst')],
+    [0.75, -0.4, tr('inverno cripto', 'crypto winter')],
+    [1, 0.2, tr('acumulação', 'accumulation')],
   ];
   const CRYPTO_MEAN = 0.195;
   function cryptoPhase(day) {

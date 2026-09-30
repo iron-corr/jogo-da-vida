@@ -2,12 +2,13 @@
   const G = globalThis.G = globalThis.G || {};
 
   // Ano comercial: 12 meses de 30 dias. Estações do hemisfério sul, uma por trimestre.
+  const tr = G.L;
   const START_YEAR = 2026;
   const SEASONS = [
-    { id: 'verao', n: 'Verão' },
-    { id: 'outono', n: 'Outono' },
-    { id: 'inverno', n: 'Inverno' },
-    { id: 'primavera', n: 'Primavera' },
+    { id: 'verao', n: tr('Verão', 'Summer') },
+    { id: 'outono', n: tr('Outono', 'Autumn') },
+    { id: 'inverno', n: tr('Inverno', 'Winter') },
+    { id: 'primavera', n: tr('Primavera', 'Spring') },
   ];
 
   G.cal = {

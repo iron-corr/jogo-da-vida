@@ -1,5 +1,6 @@
 (function () {
   const G = globalThis.G = globalThis.G || {};
+  const tr = G.L;
 
   const byId = id => G.RESEARCH.find(r => r.id === id);
 
@@ -17,7 +18,7 @@
       G.social.spent(S, r.cost || 0);
       S.research[id] = true;
       if (r.prestige) G.social.gain(S, 0, r.prestige);
-      G.news(`Pesquisa concluída: ${r.n}.`, 'unlock');
+      G.news(tr(`Pesquisa concluída: ${r.n}.`, `Research complete: ${r.n}.`), 'unlock');
     },
   };
 })();

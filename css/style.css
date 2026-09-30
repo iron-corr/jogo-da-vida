@@ -174,3 +174,7 @@ canvas.zoom { cursor: zoom-in; }
 .frac { display: inline-flex; gap: 2px; align-items: baseline; margin-left: 6px; }
 .frac button { padding: 2px 5px; font-size: 11px; }
 .goal { font-size: 11px; color: var(--muted); padding: 1px 0; }
+
+/* Troca de idioma: um link discreto no rodapé */
+#lang-bar { max-width: 1400px; margin: 0 auto; padding: 4px 14px 12px; text-align: right; font-size: 11px; }
+#lang-bar button.link { color: var(--muted); }

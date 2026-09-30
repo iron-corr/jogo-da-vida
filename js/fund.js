@@ -1,5 +1,6 @@
 (function () {
   const G = globalThis.G = globalThis.G || {};
+  const tr = G.L;
 
   // Gestora: o fundo replica a sua estratégia (alocação-alvo com robô, ou a carteira atual).
   // Receita = 2% a.a. sobre o patrimônio + 20% do que passar do CDI (com marca d'água).
@@ -23,7 +24,8 @@
       if (!F.canOpen(S)) return;
       const seed = Math.max(5e6, S.reputation * 100000);
       S.fund = { aum: seed, nav: 1, hwm: 1, rets: [], snap: { ...S.market.prices }, lastProfit: 0, lastFlow: 0, profits: [] };
-      G.news(`Gestora aberta! Amigos, família e ex-colegas confiaram ${money(seed)} a você.`, 'good');
+      G.news(tr(`Gestora aberta! Amigos, família e ex-colegas confiaram ${money(seed)} a você.`,
+        `Asset manager open! Friends, family and former colleagues trusted you with ${money(seed)}.`), 'good');
     },
     ret12(S) {
       const r = S.fund.rets.slice(-12);
@@ -49,7 +51,8 @@
       S.cash += net;
       S.fund = null;
       S.fundBlockedUntil = S.day + F.QUARANTINE;
-      G.news(`Você vendeu a gestora por ${money(gross)} (${money(net)} depois do IR). Contrato de não concorrência: 5 anos sem abrir outra.`, 'good');
+      G.news(tr(`Você vendeu a gestora por ${money(gross)} (${money(net)} depois do IR). Contrato de não concorrência: 5 anos sem abrir outra.`,
+        `You sold the asset manager for ${money(gross)} (${money(net)} after tax). Non-compete: 5 years before you can open another.`), 'good');
     },
 
     monthly(S) {
@@ -91,7 +94,8 @@
       flow = Math.max(-0.12, Math.min(0.06, flow)) / (1 + f.aum / 5e9);
       f.lastFlow = f.aum * flow;
       f.aum += f.lastFlow;
-      if (flow < -0.05) G.news(`Resgates em massa na sua gestora: ${money(-f.lastFlow)} saíram este mês.`, 'bad');
+      if (flow < -0.05) G.news(tr(`Resgates em massa na sua gestora: ${money(-f.lastFlow)} saíram este mês.`,
+        `Mass redemptions at your asset manager: ${money(-f.lastFlow)} left this month.`), 'bad');
     },
   };
 })();
