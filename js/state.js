@@ -2,7 +2,7 @@
   const G = globalThis.G = globalThis.G || {};
 
   const KEY = 'juros-compostos-save';
-  const VERSION = 10;
+  const VERSION = 11;
 
   G.newState = function (seed = (Date.now() ^ Math.floor(Math.random() * 1e9)) | 0) {
     const S = {
@@ -22,6 +22,8 @@
     S.lifespan = S.baseLifespan = G.legacy.rollLifespan(S);
     G.macro.init(S);
     G.market.init(S);
+    S.fam = G.families.init(S);
+    S.nation = G.nation.init();
     return S;
   };
 
@@ -98,6 +100,12 @@
       S.life = G.life.init();
       Object.assign(S.job, { since: S.birthDay, bonus: 1, track: 'corporativo', sabbatical: null });
       S.v = 10;
+    }
+    if (S.v < 11) { // famílias rivais e o país (presidência)
+      G.S = S;
+      S.fam = G.families.init(S);
+      S.nation = G.nation.init();
+      S.v = 11;
     }
     if (!S.routine) S.routine = 'off';
     if (!S.biz.loans) S.biz.loans = [];

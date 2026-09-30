@@ -10,7 +10,7 @@ const arg = (name, def) => {
 const YEARS = arg('years', 40), SEEDS = arg('seeds', 20);
 
 const ctx = vm.createContext({ console });
-for (const f of ['i18n', 'rng', 'format', 'calendar', 'data/assets', 'events', 'tax', 'portfolio', 'realty', 'agro', 'angel', 'automation', 'business', 'fund', 'social', 'politics', 'legacy', 'life', 'choices', 'work', 'macro', 'market', 'state'])
+for (const f of ['i18n', 'rng', 'format', 'calendar', 'data/assets', 'events', 'tax', 'portfolio', 'realty', 'agro', 'angel', 'automation', 'business', 'fund', 'social', 'politics', 'families', 'nation', 'legacy', 'life', 'choices', 'work', 'macro', 'market', 'state'])
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', f + '.js'), 'utf8'), ctx);
 const G = ctx.G;
 const pct = v => (v * 100).toFixed(2).padStart(7) + '%';

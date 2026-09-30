@@ -15,7 +15,7 @@ const ctx = vm.createContext({
 });
 const JS = path.join(__dirname, '..', 'js');
 for (const f of ['i18n', 'rng', 'format', 'calendar', 'data/assets', 'data/research', 'macro', 'market', 'events', 'tax', 'portfolio',
-  'realty', 'agro', 'angel', 'automation', 'business', 'fund', 'social', 'politics', 'legacy', 'life', 'choices', 'work', 'research', 'state'])
+  'realty', 'agro', 'angel', 'automation', 'business', 'fund', 'social', 'politics', 'families', 'nation', 'legacy', 'life', 'choices', 'work', 'research', 'state'])
   vm.runInContext(fs.readFileSync(path.join(JS, f + '.js'), 'utf8'), ctx);
 const G = ctx.G;
 

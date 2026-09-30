@@ -31,6 +31,8 @@
       G.life.monthly(S, c);
       G.choices.monthly(S);
       G.politics.monthly(S, c);
+      G.families.monthly(S);
+      G.nation.monthly(S, c);
       G.work.settle(S);
       G.auto.monthly(S, c);
       G.macro.monthly(S, c);
@@ -74,6 +76,9 @@
       'Free time counts too. New tab: Leisure (vacations, hobbies, health and collections).'));
     if (S.research.anjo || S.angel.tickets.length) open('startups', tr('Um amigo te chamou para um grupo de investidores-anjo. Nova aba: Startups.',
       'A friend invited you to an angel investor group. New tab: Startups.'));
+    if (S.fam && S.fam.noticed) open('familias', tr('Seu nome começa a aparecer ao lado das famílias mais ricas do país. Nova aba: Famílias.',
+      'Your name starts showing up next to the country\'s richest families. New tab: Families.'));
+    if (S.nation && S.nation.president) open('brasil', tr('Nova aba: Brasil.', 'New tab: Brazil.'));
     if (S.reputation >= 2) open('estilo', tr('Com o emprego firme, dá para pensar em onde morar. (Trabalho → Estilo de vida)',
       'With a steady job, you can think about where to live. (Work → Lifestyle)'));
   };

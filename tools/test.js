@@ -2,7 +2,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const root = path.join(__dirname, '..');
 const ctx = vm.createContext({ console });
-for (const f of ['i18n', 'rng', 'format', 'calendar', 'data/assets', 'events', 'tax', 'portfolio', 'realty', 'agro', 'angel', 'automation', 'business', 'fund', 'social', 'politics', 'legacy', 'life', 'choices', 'work', 'macro', 'market', 'state'])
+for (const f of ['i18n', 'rng', 'format', 'calendar', 'data/assets', 'events', 'tax', 'portfolio', 'realty', 'agro', 'angel', 'automation', 'business', 'fund', 'social', 'politics', 'families', 'nation', 'legacy', 'life', 'choices', 'work', 'macro', 'market', 'state'])
   vm.runInContext(fs.readFileSync(path.join(root, 'js', f + '.js'), 'utf8'), ctx);
 const G = ctx.G;
 let ok = true;
@@ -490,6 +490,51 @@ G.life.vacation(S, 'praia');
 eq('stress −15 nas férias', S.social.stress, 25);
 eq('sem estudar de férias', G.work.canAct(S, 1) ? 1 : 0, 0);
 G.life.vacation(S, 'europa'); eq('só uma viagem por ano', S.life.bucket.europa ? 1 : 0, 0);
+
+// 60) famílias: ranking, guerra de preços, ataque e aliança
+S = G.newState(60);
+eq('10 famílias no ranking, mais a sua', G.families.ranking(S).length, 11);
+eq('você começa em último', G.families.myRank(S), 11);
+S.cash = 1e10;
+G.business.open(S, 'padaria'); S.research.empreendedorismo = true; G.business.open(S, 'padaria');
+const p60 = G.business.monthlyProfit(S);
+S.fam.priceWar = { sector: 'varejo', until: S.day + 180, by: 'teixeira' };
+eq('guerra de preços: −20% no lucro do setor', G.business.monthlyProfit(S) / p60, 0.8);
+S.fam.priceWar = null;
+S.pol.influence = 100; S.social.prestige = 1000;
+G.families.attack(S, 'duarte'); eq('sem dossiê nem mídia grande, não dá para atacar', S.pol.influence, 100);
+G.families.st(S, 'duarte').dossie = true; const w60 = G.families.st(S, 'duarte').w;
+G.families.attack(S, 'duarte');
+eq('ataque com dossiê derruba 10% a 25% do patrimônio', w60 > G.families.st(S, 'duarte').w * 1.09 ? 1 : 0, 1);
+eq('atacada vira rival', G.families.relation(S, 'duarte') === 'rival' ? 1 : 0, 1);
+G.families.st(S, 'nogueira').att = 50; G.families.ally(S, 'nogueira');
+eq('aliança com relação ≥ 40', G.families.st(S, 'nogueira').ally ? 1 : 0, 1);
+eq('aliança custa 30 de influência', S.pol.influence, 100 - 20 - 30);
+
+// 61) presidência: requisitos, vitória, blind trust, mandato e sucessão
+S = G.newState(61);
+eq('recém-chegado não pode ser candidato', G.nation.requirements(S).every(r => r.ok) ? 1 : 0, 0);
+S.day = 40 * 360 + 60; // março de 2066, ano eleitoral
+Object.assign(S, { cash: 1e10 }); S.birthDay = 0; S.social.prestige = 900; S.pol.influence = 800; S.pol.image = 60;
+S.research.presidencia = true; G.legacy.flag(S, 'cargo');
+eq('com tudo, pode concorrer', G.nation.canRun(S) ? 1 : 0, 1);
+G.nation.launch(S, 'austero', 3e8);
+eq('campanha lançada', S.nation.campaign ? 1 : 0, 1);
+eq('acima do teto oficial vira caixa 2', S.nation.campaign.dirty, 3e8 - 150e6);
+const normal61 = G.rng.normal; G.rng.normal = () => 5; // voto garantido
+S.day = 40 * 360 + 300; G.politics.runElection(S); G.rng.normal = normal61;
+eq('eleito presidente', G.nation.isPresident(S) ? 1 : 0, 1);
+eq('plataforma do presidente governa', S.macro.policy === 'austero' ? 1 : 0, 1);
+eq('presidente opera em blind trust', G.politics.blind(S) ? 1 : 0, 1);
+eq('mandato termina em janeiro, 4 anos depois da posse', G.cal.of(S.nation.president.until).year, 2071);
+S.social.family.kids = 1; const heir61 = G.legacy.succeed(S, 'morte');
+eq('morte do presidente encerra o mandato', G.nation.isPresident(heir61) ? 1 : 0, 0);
+eq('o país continua no herdeiro', heir61.nation === S.nation ? 1 : 0, 1);
+
+// 62) dívida: juros acima do crescimento fazem a dívida subir; superávit a segura
+S = G.newState(62); const n62 = S.nation; n62.president = { since: 0, until: 1e9, term: 1, platform: 'moderado' };
+n62.stance = 2; const d62 = n62.debt; for (let m = 0; m < 12; m++) G.nation.monthly(S, { month: 3, year: 2027 });
+eq('gasto forte aumenta a dívida', n62.debt > d62 ? 1 : 0, 1);
 
 console.log(ok ? '\nTODOS OK' : '\nHÁ FALHAS');
 process.exitCode = ok ? 0 : 1;

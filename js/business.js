@@ -59,7 +59,7 @@
     price: (S, b) => b.cost * S.macro.priceIndex * Math.pow(B.growth(S), B.count(S, b.id)),
     unitProfit(S, b) {
       const season = (b.season || {})[G.cal.season(S.day).id] || 1;
-      return b.profit * S.macro.priceIndex * (1 + b.beta * (REGIME[S.macro.regime] - 1)) * season * G.politics.sectorMult(S, b.sector);
+      return b.profit * S.macro.priceIndex * (1 + b.beta * (REGIME[S.macro.regime] - 1)) * season * G.politics.sectorMult(S, b.sector) * G.families.bizMult(S, b.sector);
     },
     // Lucro mensal esperado, já descontando gerentes e imposto.
     monthlyProfit(S) {

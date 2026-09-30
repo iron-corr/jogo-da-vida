@@ -4,7 +4,8 @@
 
   // Investimento-anjo (retorno médio ~2,3x em 6-7 anos). O destino de cada startup é sorteado quando a rodada aparece;
   // o jogador só vê um sinal de tração, que é confiável na proporção da due diligence.
-  const PREFIX = ['Agro', 'Pix', 'Log', 'Saúde', 'Edu', 'Pet', 'Casa', 'Frota', 'Nuvem', 'Pay', 'Food', 'Clima', 'Obra', 'Seguro'];
+  const PREFIX = tr(['Agro', 'Pix', 'Log', 'Saúde', 'Edu', 'Pet', 'Casa', 'Frota', 'Nuvem', 'Pay', 'Food', 'Clima', 'Obra', 'Seguro'],
+    ['Agro', 'Pix', 'Log', 'Health', 'Edu', 'Pet', 'Home', 'Fleet', 'Cloud', 'Pay', 'Food', 'Climate', 'Build', 'Insure']);
   const SUFFIX = ['ly', 'io', 'Hub', 'Tech', 'Bank', 'Go', 'Now', 'AI', 'Up', 'Lab', 'Flow', 'Box'];
   const PITCH = tr([
     'marketplace de', 'app para', 'SaaS para gestão de', 'fintech de crédito para', 'plataforma de dados sobre', 'IA que automatiza',

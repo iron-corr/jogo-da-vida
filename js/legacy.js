@@ -74,6 +74,11 @@
     { id: 'mercado', n: tr('Você é o mercado', 'You are the market'), d: tr('Comprar a bolsa de valores.', 'Buy the stock exchange.'), ok: S => G.business.count(S, 'bolsa') > 0 },
     { id: 'vida_plena', n: tr('Vida plena', 'A full life'), d: tr('Manter bem-estar médio de 75 por pelo menos 10 anos.', 'Keep an average well-being of 75 for at least 10 years.'), ok: S => S.life.wellN >= 120 && G.life.avgWell(S) >= 75 },
     { id: 'mundo', n: tr('Cidadão do mundo', 'Citizen of the world'), d: tr('Visitar todos os destinos de férias.', 'Visit every vacation destination.'), ok: S => G.life.DESTINATIONS.every(d => S.life.bucket[d.id]) },
+    { id: 'top10', n: tr('Na lista', 'On the list'), d: tr('Entrar no ranking das dez famílias mais ricas do país.', 'Break into the ranking of the country\'s ten richest families.'),
+      ok: S => !!S.fam && G.families.myRank(S) <= 10 },
+    { id: 'mais_rico', n: tr('Número um', 'Number one'), d: tr('Ser a família mais rica do país.', 'Be the richest family in the country.'), ok: S => !!S.fam && G.families.myRank(S) === 1 },
+    { id: 'presidente', n: tr('Presidente', 'President'), d: tr('Ser eleito Presidente da República.', 'Be elected President of the Republic.'), ok: S => flag(S, 'presidente') },
+    { id: 'superpotencia', n: tr('Superpotência', 'Superpower'), d: tr('Transformar o Brasil numa superpotência mundial.', 'Turn Brazil into a world superpower.'), ok: S => flag(S, 'superpotencia') },
     { id: 'sabatico', n: tr('Respirar', 'Breathe'), d: tr('Tirar um ano sabático.', 'Take a sabbatical year.'), ok: S => S.job.lastSabbatical !== undefined && S.job.lastSabbatical !== null },
   ];
 
@@ -142,8 +147,14 @@
         gen: L.generation, from: G.cal.of(S.birthDay).year, to: G.cal.of(S.day).year, age: Math.floor(LG.age(S)),
         nw: real(S), lp: gained, reason,
       });
+      if (S.nation && S.nation.president) {
+        G.nation.leave(S, reason === 'morte' ? tr('O presidente morreu; o vice assume.', 'The president died; the vice president takes over.')
+          : tr('Você renunciou à Presidência para passar o bastão.', 'You resigned the Presidency to pass the torch.'));
+      }
+      if (S.nation) S.nation.campaign = null;
       const next = G.newState(S.rng);
-      Object.assign(next, { day: S.day, macro: S.macro, market: S.market, rng: S.rng, birthDay: S.day, speed: S.speed });
+      // O mundo continua: data, economia, mercado, famílias rivais e o país.
+      Object.assign(next, { day: S.day, macro: S.macro, market: S.market, rng: S.rng, birthDay: S.day, speed: S.speed, fam: S.fam, nation: S.nation });
       // O herdeiro mantém a estratégia e as preferências (alvos, robô, piloto, dicas...).
       next.auto = S.auto;
       next.routine = S.routine;

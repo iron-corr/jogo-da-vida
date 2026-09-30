@@ -12,7 +12,7 @@ const arg = (name, def) => {
 const YEARS = arg('years', 200), SEEDS = arg('seeds', 20);
 
 const JS = path.join(__dirname, '..', 'js');
-const FILES = ['i18n.js', 'rng.js', 'format.js', 'calendar.js', 'data/assets.js', 'events.js', 'tax.js', 'portfolio.js', 'realty.js', 'agro.js', 'angel.js', 'automation.js', 'business.js', 'fund.js', 'social.js', 'politics.js', 'legacy.js', 'life.js', 'choices.js', 'macro.js', 'market.js', 'state.js'];
+const FILES = ['i18n.js', 'rng.js', 'format.js', 'calendar.js', 'data/assets.js', 'events.js', 'tax.js', 'portfolio.js', 'realty.js', 'agro.js', 'angel.js', 'automation.js', 'business.js', 'fund.js', 'social.js', 'politics.js', 'families.js', 'nation.js', 'legacy.js', 'life.js', 'choices.js', 'macro.js', 'market.js', 'state.js'];
 const ctx = vm.createContext({ console });
 for (const f of FILES) vm.runInContext(fs.readFileSync(path.join(JS, f), 'utf8'), ctx, { filename: f });
 const G = ctx.G;

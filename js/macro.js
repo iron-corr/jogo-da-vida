@@ -61,7 +61,8 @@
   function target(S) {
     const r = REGIMES[S.macro.regime], p = POLICIES[S.macro.policy];
     const bc = (S.pol && S.pol.bcBias) || 0; // diretor do BC: juros mais baixos agora, inflação depois
-    return { selic: r.selic + p.selic + bc, infl: r.infl + p.infl - bc * 0.8 };
+    const n = G.nation ? G.nation.macroAdj(S) : { selic: 0, infl: 0 }; // dívida, postura fiscal e pressão sobre o BC
+    return { selic: r.selic + p.selic + bc + n.selic, infl: r.infl + p.infl - bc * 0.8 + n.infl };
   }
 
   function copom(S) {
@@ -93,7 +94,7 @@
     const w = m.daysLeft < LEAD_DAYS ? 1 - m.daysLeft / LEAD_DAYS : 0;
     m.pmi += (PMI[m.regime] * (1 - w) + PMI[m.next] * w - m.pmi) * 0.03;
     m.pmiNoise = 0.97 * m.pmiNoise + G.rng.normal() * 0.3;
-    m.unemp += (UNEMP[m.regime] - m.unemp) * 0.004;
+    m.unemp += (UNEMP[m.regime] - (G.nation ? G.nation.unempShift(S) : 0) - m.unemp) * 0.004;
     m.focusNoise = 0.98 * m.focusNoise + G.rng.normal() * 0.0007;
   }
 

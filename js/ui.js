@@ -16,6 +16,8 @@
     ['imoveis', tr('Imóveis', 'Real estate')],
     ['terras', tr('Terras', 'Land')],
     ['startups', 'Startups'],
+    ['familias', tr('Famílias', 'Families')],
+    ['brasil', tr('Brasil', 'Brazil')],
     ['legado', tr('Legado', 'Legacy')],
   ];
 
@@ -51,11 +53,11 @@
   };
   const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
 
-  // Aceita "1.500,50", "1500.5", "R$ 2 mil" não (só números). Em inglês, "1,500.50".
+  // Aceita "1.500,50", "400.000", "1500.5", "R$ 2 mil" não (só números). Em inglês, "1,500.50".
   function parseMoney(s) {
     s = String(s).replace(/[^\d,.]/g, '');
     if (G.EN) s = s.replace(/,/g, '');
-    else if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+    else if (s.includes(',') || /^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '').replace(',', '.'); // "400.000" = 400 mil
     return parseFloat(s) || 0;
   }
 
@@ -162,6 +164,53 @@
       case 'valor': return tr(`pequeno para o seu padrão de vida: precisa valer ${f.money(G.life.homeMin(S))}`, `too small for your lifestyle: must be worth ${f.money(G.life.homeMin(S))}`);
     }
     return '';
+  }
+
+  // Presidência da República (aba Poder): requisitos, candidatura, campanha e reeleição.
+  function presidencySection(S, opts) {
+    const N = G.nation, n = S.nation, P = G.macro.POLICIES;
+    let h = `<section class="card"><h3>${tr('Presidência da República', 'Presidency of the Republic')}</h3>`;
+    if (N.isPresident(S)) {
+      h += `<p class="good">${tr(`Você é o presidente (${n.president.term}º mandato, até ${f.monthYear(n.president.until)}). O governo fica na aba Brasil.`,
+        `You are the president (term ${n.president.term}, until ${f.monthYear(n.president.until)}). The government is in the Brazil tab.`)}</p>`;
+    }
+    if (n.campaign) {
+      h += `<p>${tr(`Em campanha pela plataforma <b>${P[n.campaign.platform].n}</b>, com ${f.money(n.campaign.budget)}.`,
+        `Campaigning on the <b>${P[n.campaign.platform].n}</b> platform, with ${f.money(n.campaign.budget)}.`)} <span id="pr-vote"></span></p>
+        <p class="muted">${tr('A eleição é em novembro: precisa de mais de 50% dos votos válidos no segundo turno. Debates e gafes de agosto a outubro mexem nas pesquisas.',
+          'The election is in November: you need more than 50% of the valid votes in the runoff. Debates and gaffes from August to October move the polls.')}</p>`;
+    } else if (!N.isPresident(S) || N.reelection(S)) {
+      if (!N.isPresident(S)) {
+        h += `<p class="muted">${tr('A eleição mais difícil do país. Requisitos para ser candidato:', 'The hardest election in the country. Requirements to run:')}</p><ul>` +
+          N.requirements(S).map((r, i) => `<li id="pr-q-${i}">${r.t}</li>`).join('') + '</ul>';
+      } else h += `<p>${tr('Você pode concorrer à reeleição. O resultado depende quase só da aprovação do governo.', 'You can run for reelection. The result depends almost entirely on your government\'s approval.')}</p>`;
+      h += `<p class="muted">${tr(`Candidaturas de janeiro a julho de ano eleitoral (próxima eleição: ${G.cal.nextElection(S.day)}). Custa 100 de influência e a verba de campanha;
+        acima de ${f.money(N.OFFICIAL_LIMIT * S.macro.priceIndex)} é caixa 2. Contam imagem, influência, posição social, dinheiro, mídia própria, famílias aliadas (e rivais) e a economia.`,
+        `Candidacies from January to July of an election year (next election: ${G.cal.nextElection(S.day)}). It costs 100 influence plus the campaign budget;
+        anything above ${f.money(N.OFFICIAL_LIMIT * S.macro.priceIndex)} is off the books. Image, influence, social status, money, your own media, allied (and rival) families and the economy all count.`)}</p>
+        <p>${N.reelection(S) ? '' : `${tr('Plataforma', 'Platform')} <select id="pr-side">${opts('moderado')}</select> `}
+        ${tr('Verba de campanha', 'Campaign budget')} <input id="pr-budget" inputmode="decimal" placeholder="${tr('valor em R$', 'amount in R$')}">
+        <button data-act="run" id="b-run">${N.reelection(S) ? tr('Concorrer à reeleição', 'Run for reelection') : tr('Lançar candidatura', 'Launch candidacy')}</button></p>`;
+    }
+    return h + '</section>';
+  }
+  function updatePresidency(S) {
+    const N = G.nation, n = S.nation;
+    if (n.campaign) {
+      const v = N.expectedVote(S);
+      set('pr-vote', tr(`Pesquisa: ~${f.pct(v, 0)} dos votos válidos (margem de 6 pontos).`, `Poll: ~${f.pct(v, 0)} of the valid votes (6-point margin).`));
+      return;
+    }
+    N.requirements(S).forEach((r, i) => {
+      const el = $(`pr-q-${i}`);
+      if (el) { set(`pr-q-${i}`, `${r.ok ? '✓' : '✗'} ${r.t}`); el.className = r.ok ? 'good' : 'bad'; }
+    });
+    const req = N.reelection(S) || N.requirements(S).every(r => r.ok);
+    dis('b-run', !N.canRun(S) || S.pol.influence < 100 || S.cash < N.minBudget(S));
+    why('b-run', !N.window(S) ? tr(`candidaturas só de janeiro a julho de ${G.cal.nextElection(S.day)}`, `candidacies only from January to July of ${G.cal.nextElection(S.day)}`)
+      : !req ? tr('faltam requisitos', 'requirements not met')
+      : S.pol.influence < 100 ? tr('precisa de 100 de influência', 'needs 100 influence')
+      : need(S, { cash: N.minBudget(S) }) || tr(`verba mínima de ${f.money(N.minBudget(S))}`, `minimum budget of ${f.money(N.minBudget(S))}`));
   }
 
   // Explicações do painel lateral (aparecem ao passar o mouse).
@@ -1106,7 +1155,8 @@
         const pol = S.pol;
         return [G.social.tierIdx(S), S.macro.policy, !!pol.poll, Object.keys(pol.backed).join(','), pol.bills.map(b => b.id).join(','),
           Object.keys(pol.passed).join(','), Object.keys(pol.media).join(','), pol.thinkTank ? pol.thinkTank.side : '', Object.keys(pol.entities).join(','),
-          pol.office ? pol.office.id : '', ['relacoes_institucionais', 'midia', 'filantropia_estrategica', 'economia_politica'].map(r => +!!S.research[r]).join('')].join('|');
+          pol.office ? pol.office.id : '', ['relacoes_institucionais', 'midia', 'filantropia_estrategica', 'economia_politica'].map(r => +!!S.research[r]).join(''),
+          G.nation.isPresident(S), !!S.nation.campaign, G.nation.window(S), G.nation.reelection(S)].join('|');
       },
       build(S) {
         const PL = G.politics, pol = S.pol, P = G.macro.POLICIES, t = G.social.tierIdx(S);
@@ -1202,7 +1252,7 @@
           h += '</td></tr>';
         }
         h += '</table></section>';
-        return h;
+        return h + presidencySection(S, opts);
       },
       update(S) {
         const PL = G.politics, pol = S.pol;
@@ -1238,6 +1288,7 @@
             : G.social.tierIdx(S) < o.tier ? tr(`requer posição ${G.social.TIERS[o.tier][1]}`, `requires ${G.social.TIERS[o.tier][1]} status`)
             : o.access && !pol.access ? tr('precisa ter apoiado o governo eleito', 'you must have backed the elected government') : '');
         }
+        updatePresidency(S);
       },
     },
 
@@ -1609,6 +1660,161 @@
       },
     },
 
+    familias: {
+      key: S => [G.social.tierIdx(S), G.families.ranking(S).map(r => r.id).join(), G.politics.hasBigMedia(S),
+        G.families.FAMILIES.map(fm => G.families.relation(S, fm.id) + (G.families.st(S, fm.id).dossie ? 'd' : '')).join()].join('|'),
+      build(S) {
+        const FM = G.families, P = G.macro.POLICIES;
+        let h = `<section class="card summary"><span>${tr('Sua posição no ranking', 'Your ranking position')} <b id="fm-rank"></b></span>
+          <span>${tr('Aliadas', 'Allies')} <b>${FM.allies(S).length}/${FM.MAX_ALLIES}</b></span><span id="fm-war" class="bad"></span></section>
+          <p class="muted">${tr(`As famílias mais ricas do país. Cada uma vive de um setor e é um grupo de poder ligado a uma plataforma política: empurra a sua nas eleições.
+          Competir no setor delas, apoiar a plataforma rival ou atacá-las cria rivais, e rivais sabotam (guerra de preços, difamação, lobby contra, roubo de gerentes, denúncias).
+          Aliadas abrem portas, ajudam em campanhas e deixam de sabotar. Ações com a mesma família: uma a cada 3 meses.`,
+          `The country's richest families. Each lives off a sector and is a power group tied to a political platform, pushing it in elections.
+          Competing in their sector, backing the rival platform or attacking them creates rivals, and rivals sabotage you (price wars, smears, lobbying against you, poaching managers, complaints).
+          Allies open doors, help in campaigns and stop sabotaging. Actions with the same family: one every 3 months.`)}</p>
+          <section class="card"><table class="tbl"><tr><td><b>#</b></td><td><b>${tr('Família', 'Family')}</b></td><td><b>${tr('Patrimônio', 'Net worth')}</b></td>
+          <td><b>${tr('Relação', 'Relationship')}</b></td><td></td></tr>`;
+        FM.ranking(S).forEach((r, i) => {
+          if (r.you) {
+            h += `<tr class="cur"><td>${i + 1}</td><td>${tr(`Sua família (${S.legacy.generation}ª geração)`, `Your family (generation ${S.legacy.generation})`)}</td><td id="fm-w-voce"></td><td></td><td></td></tr>`;
+            return;
+          }
+          const fm = FM.byId(r.id), x = FM.st(S, r.id);
+          h += `<tr><td>${i + 1}</td><td><b>${fm.n}</b><br><small class="muted">${FM.sectorName(fm)} · ${P[fm.side].n} · ${fm.d}</small></td>
+            <td id="fm-w-${fm.id}"></td><td id="fm-r-${fm.id}"></td><td class="ops">
+            <button data-act="fam-approach" data-id="${fm.id}" id="b-fa-${fm.id}">${tr('Aproximar', 'Get closer')} <small id="fm-ac-${fm.id}"></small></button>
+            ${x.ally ? `<button data-act="fam-break" data-id="${fm.id}">${tr('Romper aliança', 'Break alliance')}</button>`
+              : `<button data-act="fam-ally" data-id="${fm.id}" id="b-fl-${fm.id}">${tr('Propor aliança', 'Propose alliance')} <small>30 ${tr('influência', 'influence')}</small></button>`}
+            <button data-act="fam-inv" data-id="${fm.id}" id="b-fi-${fm.id}">${tr('Investigar', 'Investigate')} <small id="fm-ic-${fm.id}"></small></button>
+            <button data-act="fam-attack" data-id="${fm.id}" id="b-fk-${fm.id}">${tr('Atacar na mídia', 'Attack in the media')}${x.dossie ? ` <small>${tr('com dossiê', 'with dossier')}</small>` : ''}</button></td></tr>`;
+        });
+        return h + '</table></section>';
+      },
+      update(S) {
+        const FM = G.families;
+        set('fm-rank', tr(`${FM.myRank(S)}º`, `#${FM.myRank(S)}`));
+        set('fm-w-voce', f.money(Math.max(0, G.portfolio.netWorth(S))));
+        const war = S.fam.priceWar;
+        set('fm-war', war && S.day < war.until ? tr(`Guerra de preços da família ${FM.byId(war.by).n}: suas empresas do setor lucram 20% menos até ${f.monthYear(war.until)}.`,
+          `Price war by the ${FM.byId(war.by).n} family: your businesses in the sector earn 20% less until ${f.monthYear(war.until)}.`) : '');
+        for (const fm of FM.FAMILIES) {
+          const x = FM.st(S, fm.id), rel = FM.relation(S, fm.id);
+          set(`fm-w-${fm.id}`, f.money(x.w));
+          const el = $(`fm-r-${fm.id}`);
+          if (el) {
+            el.textContent = `${FM.RELATION_NAME[rel]} (${f.num(x.att, 0)})`;
+            el.className = rel === 'aliada' || rel === 'amistosa' ? 'good' : rel === 'hostil' || rel === 'rival' ? 'bad' : '';
+          }
+          const tier = G.social.tierIdx(S) < FM.tierReq(fm) ? tr(`requer posição ${G.social.TIERS[FM.tierReq(fm)][1]}`, `requires ${G.social.TIERS[FM.tierReq(fm)][1]} status`) : '';
+          const wait = S.day < x.cd ? tr(`de novo em ${x.cd - S.day} dias`, `available again in ${x.cd - S.day} days`) : '';
+          set(`fm-ac-${fm.id}`, f.money(FM.approachCost(S)));
+          set(`fm-ic-${fm.id}`, f.money(FM.investigateCost(S)));
+          dis(`b-fa-${fm.id}`, !FM.canAct(S, fm) || S.cash < FM.approachCost(S));
+          why(`b-fa-${fm.id}`, tier || wait || need(S, { cash: FM.approachCost(S) }));
+          dis(`b-fl-${fm.id}`, !FM.canAlly(S, fm));
+          why(`b-fl-${fm.id}`, FM.canAlly(S, fm) ? '' : tier || wait || (x.att < 40 ? tr('a relação precisa estar em 40 ou mais', 'the relationship must be 40 or higher')
+            : FM.allies(S).length >= FM.MAX_ALLIES ? tr(`no máximo ${FM.MAX_ALLIES} aliadas`, `at most ${FM.MAX_ALLIES} allies`) : tr('precisa de 30 de influência', 'needs 30 influence')));
+          dis(`b-fi-${fm.id}`, S.day < x.cd || S.cash < FM.investigateCost(S));
+          why(`b-fi-${fm.id}`, wait || need(S, { cash: FM.investigateCost(S) }));
+          dis(`b-fk-${fm.id}`, !FM.canAttack(S, fm));
+          why(`b-fk-${fm.id}`, FM.canAttack(S, fm) ? '' : wait || (!x.dossie && !G.politics.hasBigMedia(S)
+            ? tr('precisa de um dossiê (investigar) ou de um portal ou canal de TV', 'needs a dossier (investigate) or a news website or TV channel') : tr('precisa de 20 de influência', 'needs 20 influence')));
+        }
+      },
+    },
+
+    brasil: {
+      key: S => {
+        const N = G.nation, n = S.nation;
+        return [N.isPresident(S), n.pending ? n.pending.id : '', Object.keys(n.reforms).join(), n.unSeat, !!n.reforms.bc_autonomo,
+          N.worldRanking(S).map(r => r.id).join()].join('|');
+      },
+      build(S) {
+        const N = G.nation, n = S.nation, pres = N.isPresident(S), P = G.macro.POLICIES;
+        let h = `<section class="card summary"><span>${tr('PIB', 'GDP')} <b id="nx-gdp"></b></span><span>${tr('Crescimento', 'Growth')} <b id="nx-g"></b></span>
+          <span>${tr('Dívida pública', 'Public debt')} <b id="nx-debt"></b></span><span>${tr('Aprovação', 'Approval')} <b id="nx-appr"></b></span>
+          <span>${tr('Governabilidade', 'Governability')} <b id="nx-gov"></b></span><span>${tr('Poder nacional', 'National power')} <b id="nx-pow"></b></span>
+          <span>${tr('Posição no mundo', 'World rank')} <b id="nx-rank"></b></span></section>`;
+        if (!pres) {
+          h += `<p class="muted">${tr(`Governo atual: plataforma ${P[S.macro.policy].n}, conduzido pela IA. Você só governa se vencer a eleição presidencial (aba Poder).`,
+            `Current government: ${P[S.macro.policy].n} platform, run by the AI. You only govern if you win the presidential election (Power tab).`)}</p>`;
+        } else {
+          h += `<section class="card"><h3>${tr('Orçamento', 'Budget')}</h3>
+            <p class="muted">${tr('Divida o gasto do governo entre as áreas (em %; o total é normalizado). Cada índice persegue um alvo que depende da verba; educação e tecnologia respondem devagar.',
+              'Split government spending across areas (in %; the total is normalized). Each index chases a target set by its funding; education and technology respond slowly.')}</p>
+            <table class="tbl alloc"><tr><td><b>${tr('Área', 'Area')}</b></td><td><b>${tr('Verba', 'Funding')}</b></td><td><b>${tr('Índice', 'Index')}</b></td></tr>`;
+          for (const a of N.AREAS) {
+            h += `<tr><td>${a.n}</td><td><input class="num" data-nb="${a.id}" value="${n.budget[a.id]}" inputmode="numeric"> %</td><td id="nb-v-${a.id}"></td></tr>`;
+          }
+          const stances = [[-2, tr('austeridade forte', 'strong austerity')], [-1, tr('austeridade', 'austerity')], [0, tr('neutra', 'neutral')], [1, tr('expansão', 'expansion')], [2, tr('expansão forte', 'strong expansion')]];
+          h += `</table><p class="muted" id="nb-sum"></p></section>
+            <section class="card"><h3>${tr('Política econômica', 'Economic policy')}</h3>
+            <p>${tr('Postura fiscal', 'Fiscal stance')} <select data-set="stance">${stances.map(([v, l]) => `<option value="${v}"${v === n.stance ? ' selected' : ''}>${l}</option>`).join('')}</select>
+            <span class="muted">${tr('gastar mais acelera o crescimento e a aprovação agora, mas aumenta déficit, dívida e inflação', 'spending more speeds up growth and approval now, but raises the deficit, debt and inflation')}</span></p>
+            <p>${tr('Emendas e cargos para a base', 'Pork and posts for the coalition')} <select data-set="emendas">${[0, 1, 2, 3].map(v => `<option value="${v}"${v === n.emendas ? ' selected' : ''}>${v}</option>`).join('')}</select>
+            <span class="muted">${tr('cada nível dá governabilidade, custa 0,2% do PIB por ano, corrói as instituições e suja você', 'each level adds governability, costs 0.2% of GDP a year, erodes institutions and dirties you')}</span></p>
+            <p><label class="check"><input type="checkbox" data-act="bc" id="nx-bc"${n.reforms.bc_autonomo ? ' disabled' : ''}> ${tr('Pressionar o Banco Central por juros menores (Selic −1 ponto, inflação sobe)',
+              'Pressure the Central Bank for lower rates (Selic −1 point, inflation rises)')}</label></p></section>
+            <section class="card"><h3>${tr('Reformas', 'Reforms')}</h3>
+            <p class="muted">${tr('Uma por vez. Enviar gasta governabilidade; a aprovação depende da governabilidade e das instituições.',
+              'One at a time. Sending one spends governability; passage depends on governability and institutions.')}</p><table class="tbl">`;
+          for (const r of N.REFORMS) {
+            const st = n.reforms[r.id] ? `<span class="good">${tr('aprovada', 'passed')}</span>`
+              : n.pending && n.pending.id === r.id ? `<span class="muted" id="nx-pend"></span>`
+              : `<button data-act="reform" data-id="${r.id}" id="b-nr-${r.id}">${tr('Enviar ao Congresso', 'Send to Congress')} <small>${tr('governab.', 'govern.')} ${f.pct(r.gov, 0)}</small></button>`;
+            h += `<tr><td><b>${r.n}</b><br><small class="muted">${r.d} ${tr(`Tramitação: ${r.months} meses.`, `Takes ${r.months} months.`)}</small></td><td>${st}</td></tr>`;
+          }
+          h += `</table></section><section class="card"><h3>${tr('Diplomacia', 'Diplomacy')}</h3><div class="btns">
+            <button data-act="summit" id="b-summit">${tr('Viagem de Estado', 'State visit')} <small>${tr('diplomacia +3 · uma a cada 3 meses', 'diplomacy +3 · one every 3 months')}</small></button>
+            ${n.unSeat ? `<span class="good">${tr('Assento permanente na ONU conquistado', 'Permanent UN seat secured')}</span>`
+              : `<button data-act="unseat" id="b-un">${tr('Assento permanente no Conselho de Segurança da ONU', 'Permanent UN Security Council seat')} <small>${tr('diplomacia 80 e top 6 do mundo', 'diplomacy 80 and world top 6')}</small></button>`}
+            </div></section>`;
+        }
+        h += `<section class="card"><h3>${tr('Índices do país', 'Country indices')}</h3><table class="tbl">`;
+        for (const a of N.AREAS.concat(N.EXTRA)) h += `<tr><td>${a.n}</td><td id="nx-i-${a.id}"></td></tr>`;
+        h += `</table></section><section class="card"><h3>${tr('Poder mundial', 'World power')}</h3>
+          <p class="muted">${tr(`Tamanho e renda da economia, educação, tecnologia, defesa, diplomacia, instituições, infraestrutura e estabilidade. Superpotência: poder ${N.SUPERPOWER} e top 3.`,
+            `Economic size and income, education, technology, defense, diplomacy, institutions, infrastructure and stability. Superpower: power ${N.SUPERPOWER} and top 3.`)}</p><table class="tbl">`;
+        N.worldRanking(S).forEach((r, i) => {
+          h += `<tr class="${r.you ? 'cur' : ''}"><td>${i + 1}</td><td>${r.n}</td><td id="nw-${r.id}"></td></tr>`;
+        });
+        return h + '</table></section>';
+      },
+      update(S) {
+        const N = G.nation, n = S.nation, pres = N.isPresident(S);
+        set('nx-gdp', f.money(n.gdpReal * S.macro.priceIndex));
+        const g = $('nx-g');
+        if (g) { g.textContent = f.signedPct(n.growth, 1) + tr(' a.a.', ' p.a.'); g.className = n.growth >= 0.02 ? 'good' : n.growth < 0 ? 'bad' : ''; }
+        const debt = $('nx-debt');
+        if (debt) { debt.textContent = f.pct(n.debt, 0) + tr(' do PIB', ' of GDP'); debt.className = n.debt > 1 ? 'bad' : ''; }
+        const ap = $('nx-appr');
+        if (ap) { ap.textContent = f.pct(n.approval, 0); ap.className = n.approval < 0.25 ? 'bad' : n.approval > 0.5 ? 'good' : ''; }
+        set('nx-gov', f.pct(n.gov, 0));
+        set('nx-pow', f.num(N.power(S), 1));
+        set('nx-rank', tr(`${N.rank(S)}º`, `#${N.rank(S)}`));
+        for (const a of N.AREAS.concat(N.EXTRA)) set(`nx-i-${a.id}`, f.num(n.idx[a.id], 0));
+        for (const r of N.worldRanking(S)) set(`nw-${r.id}`, f.num(r.p, 1));
+        if (!pres) return;
+        const sh = N.shares(S);
+        for (const a of N.AREAS) set(`nb-v-${a.id}`, `${f.num(n.idx[a.id], 0)} · ${f.pct(sh[a.id] / 100, 0)}`);
+        const total = Object.values(n.budget).reduce((s, v) => s + v, 0);
+        set('nb-sum', tr(`Total digitado: ${f.num(total, 0)}%. Déficit primário: ${f.pct(N.primary(S), 1)} do PIB por ano.`,
+          `Total entered: ${f.num(total, 0)}%. Primary deficit: ${f.pct(N.primary(S), 1)} of GDP a year.`));
+        const bc = $('nx-bc');
+        if (bc) bc.checked = !!n.bcPressure;
+        if (n.pending) set('nx-pend', tr(`em votação: ${n.pending.left} mês(es)`, `being voted: ${n.pending.left} month(s)`));
+        for (const r of N.REFORMS) {
+          dis(`b-nr-${r.id}`, !N.canReform(S, r));
+          why(`b-nr-${r.id}`, N.canReform(S, r) ? '' : n.pending ? tr('já há uma reforma em votação', 'a reform is already being voted') : tr(`precisa de ${f.pct(r.gov, 0)} de governabilidade`, `needs ${f.pct(r.gov, 0)} governability`));
+        }
+        dis('b-summit', !N.canDiplomacy(S));
+        why('b-summit', N.canDiplomacy(S) ? '' : tr(`de novo em ${n.dipCd - S.day} dias`, `available again in ${n.dipCd - S.day} days`));
+        dis('b-un', !N.canUN(S));
+        why('b-un', N.canUN(S) ? '' : tr('precisa de diplomacia 80 e estar no top 6 do mundo', 'needs diplomacy 80 and a world top 6 spot'));
+      },
+    },
+
     startups: {
       key: S => S.angel.deals.map(d => d.name + d.until).join(',') + '|' + S.angel.tickets.length,
       build(S) {
@@ -1744,7 +1950,7 @@
     const loans = re.pmt + G.business.monthlyPayments(S);
     const fam = S.social.family, spouse = fam.married ? fam.spouseIncome * S.macro.priceIndex : 0;
     const social = spouse - G.social.clubFees(S) - G.social.schoolCost(S) - G.social.partilhaPayment(S);
-    const officePay = S.pol.office ? G.politics.office(S.pol.office.id).pay * S.macro.priceIndex : 0;
+    const officePay = (S.pol.office ? G.politics.office(S.pol.office.id).pay * S.macro.priceIndex : 0) + G.nation.pay(S);
     const polCost = G.politics.mediaUpkeep(S) + G.politics.thinkTankCost(S) + G.politics.entityFees(S) - officePay;
     const agro = G.agro.monthlyExpected(S) - G.agro.monthlyCost(S);
     // Mesma conta do motor: tudo que entra menos W.outflow (custo de vida, parcelas, clubes, política...).
@@ -1899,6 +2105,24 @@
       case 'tt-stop': G.politics.stopThinkTank(S); break;
       case 'ent-join': G.politics.joinEntity(S, id); break;
       case 'ent-leave': G.politics.leaveEntity(S, id); break;
+      case 'run': {
+        const N = G.nation;
+        const plat = ($('pr-side') || {}).value || (S.nation.president && S.nation.president.platform), budget = parseMoney(($('pr-budget') || {}).value || '');
+        if (budget < N.minBudget(S)) G.news(tr(`A verba mínima de campanha é ${f.money(N.minBudget(S))}.`, `The minimum campaign budget is ${f.money(N.minBudget(S))}.`), 'info');
+        else N.launch(S, plat, budget);
+        break;
+      }
+      case 'fam-approach': G.families.approach(S, id); break;
+      case 'fam-ally': G.families.ally(S, id); break;
+      case 'fam-break': G.families.breakAlly(S, id); break;
+      case 'fam-inv': G.families.investigate(S, id); break;
+      case 'fam-attack':
+        if (confirm(tr('Atacar essa família na mídia? A relação vira guerra e a retaliação é provável.', 'Attack this family in the media? The relationship turns into war and retaliation is likely.'))) G.families.attack(S, id);
+        break;
+      case 'reform': G.nation.proposeReform(S, id); break;
+      case 'summit': G.nation.summit(S); break;
+      case 'unseat': G.nation.unSeat(S); break;
+      case 'bc': G.nation.setBC(S, b.checked); break;
       case 'office': G.politics.takeOffice(S, id, ($('p-bc') || {}).value); break;
       case 'vacation': G.life.vacation(S, id); break;
       case 'hobby-start': G.life.startHobby(S, id); break;
@@ -2024,6 +2248,9 @@
     else if (el.dataset.set === 'reserve') S.auto.reserve = Math.max(0, parseFloat(el.value.replace(',', '.')) || 0);
     else if (el.dataset.set === 'robot') S.auto.robot = el.value;
     else if (el.dataset.set === 'routine') S.routine = el.value;
+    else if (el.dataset.nb) G.nation.setBudget(S, el.dataset.nb, parseFloat(el.value.replace(',', '.')));
+    else if (el.dataset.set === 'stance') G.nation.setStance(S, el.value);
+    else if (el.dataset.set === 'emendas') G.nation.setEmendas(S, el.value);
     else if (el.dataset.set === 'crop') {
       if (G.politics.blind(S)) G.news(BLIND_MSG, 'info');
       else G.agro.setCrop(S, +el.dataset.i, el.value);
