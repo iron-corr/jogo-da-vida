@@ -183,6 +183,15 @@ eq('custo casado com 1 filho', G.work.cost(S) / base23, 1.4 * 1.25);
 eq('recuperação depois do parto', G.social.kidState(S) === 'recovering' ? 1 : 0, 1);
 S.day += 360; eq('pode tentar de novo depois de 1 ano', G.social.kidState(S) === 'ready' ? 1 : 0, 1);
 
+// 23b) palestra paga: no máximo uma a cada 5 dias
+S = G.newState(231); S.research.oratoria = true; S.social.prestige = 500; S.energy = 1000; S.burnout = 0;
+let cash23b = S.cash; G.social.doActivity(S, 'palestra');
+eq('palestra paga cachê', S.cash > cash23b ? 1 : 0, 1);
+cash23b = S.cash; S.day += 4; G.social.doActivity(S, 'palestra');
+eq('sem palestra antes de 5 dias', S.cash - cash23b, 0);
+S.day += 1; G.social.doActivity(S, 'palestra');
+eq('palestra liberada no 5º dia', S.cash > cash23b ? 1 : 0, 1);
+
 // 24) doação: prestígio cresce com a raiz do valor doado
 S = G.newState(24); S.cash = 1e6; G.social.donate(S, 100000);
 eq('prestígio por R$ 100 mil doados', S.social.prestige, 5);

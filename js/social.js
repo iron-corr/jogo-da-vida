@@ -46,7 +46,8 @@
     { id: 'conferencia', n: tr('Conferência anual (só no outono)', 'Annual conference (autumn only)'), energy: 60, cost: 15000, vis: 8, prest: 4, know: 20, tier: 1, season: 'outono', cooldown: 300 },
     { id: 'mentoria', n: tr('Mentorar juniores', 'Mentor juniors'), energy: 25, cost: 0, prest: 1.5, know: 1, tier: 2 },
     { id: 'artigo', n: tr('Escrever um artigo', 'Write an article'), energy: 20, cost: 0, vis: 2, prest: 0.5, req: 'comunicacao' },
-    { id: 'palestra', n: tr('Dar uma palestra paga', 'Give a paid talk'), energy: 40, cost: 0, vis: 3, prest: 2, fee: true, tier: 3, req: 'oratoria' },
+    { id: 'palestra', n: tr('Dar uma palestra paga (1 a cada 5 dias)', 'Give a paid talk (once every 5 days)'), energy: 40, cost: 0, vis: 3, prest: 2, fee: true, tier: 3,
+      req: 'oratoria', cooldown: 5 },
     { id: 'livro', n: tr('Escrever um livro', 'Write a book'), energy: 150, cost: 0, vis: 10, prest: 20, tier: 2, req: 'comunicacao', cooldown: 720 },
   ];
 
