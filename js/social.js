@@ -259,8 +259,10 @@
       SO.addStress(S, -10);
       G.news(tr(`Você se casou${big ? ' numa festa que saiu em todas as colunas sociais' : ''}!`, `You got married${big ? ' at a party that made every society column' : ''}!`) +
         (f.spouseIncome ? tr(` A renda do casal cresce ${money(f.spouseIncome * pi(S))}/mês.`, ` Household income grows by ${money(f.spouseIncome * pi(S))}/month.`) : ''), 'good');
+      G.work.checkRoom(S);
     },
     // 'trying' (tentando engravidar), 'pregnant', 'recovering' (depois do parto) ou 'ready'.
+    familySize: S => 1 + (S.social.family.married ? 1 : 0) + S.social.family.kids,
     kidState(S) {
       const f = S.social.family;
       return f.pregnant ? 'pregnant' : f.trying ? 'trying' : S.day < (f.nextKid || 0) ? 'recovering' : 'ready';
@@ -284,6 +286,7 @@
         f.nextKid = S.day + RECOVERY;
         G.news(tr(`Nasceu seu ${f.kids}º filho! O custo de vida sobe, mas agora existe um herdeiro.`,
           `Your child #${f.kids} is born! The cost of living goes up, but now there is an heir.`), 'good');
+        G.work.checkRoom(S);
       } else if (f.trying && G.rng.chance(CONCEIVE)) {
         f.trying = false;
         f.pregnant = { due: S.day + PREGNANCY };
@@ -371,6 +374,7 @@
       if (S.cash < 0) SO.addStress(S, 10);
       if (!S.job.employed && !S.job.retired) SO.addStress(S, 8);
       if (G.business.drain(S) + G.agro.drain(S) > G.work.regen(S)) SO.addStress(S, 5);
+      SO.addStress(S, 3 * G.work.crowded(S)); // casa apertada para a família
       SO.addStress(S, -4 - (has(S, 'exercicio') ? 4 : 0) - (has(S, 'meditacao') ? 10 : 0) - (f.married ? 3 : 0));
       if (so.stress > 70) {
         for (const id of Object.keys(so.habits)) {

@@ -4,9 +4,12 @@
 
   // Imóveis físicos. O preço segue o índice imobiliário (G.ASSETS.imob) a partir do valor base.
   // yield = aluguel bruto anual; vacate = chance mensal de o inquilino sair.
+  // people = quantas pessoas moram nele (só os residenciais servem de casa própria).
   G.PROPERTIES = [
-    { id: 'kitnet', n: tr('Kitnet no centro', 'Downtown studio'), base: 180000, yield: 0.06, vacate: 0.04 },
-    { id: 'apto', n: tr('Apartamento de 2 quartos', '2-bedroom apartment'), base: 450000, yield: 0.045, vacate: 0.025 },
+    { id: 'kitnet', n: tr('Kitnet no centro', 'Downtown studio'), base: 180000, yield: 0.06, vacate: 0.04, people: 2 },
+    { id: 'apto', n: tr('Apartamento de 2 quartos', '2-bedroom apartment'), base: 450000, yield: 0.045, vacate: 0.025, people: 4 },
+    { id: 'casa', n: tr('Casa em condomínio', 'House in a gated community'), base: 1800000, yield: 0.04, vacate: 0.03, people: 6 },
+    { id: 'cobertura', n: tr('Cobertura', 'Penthouse'), base: 4000000, yield: 0.035, vacate: 0.04, people: 10 },
     { id: 'sala', n: tr('Sala comercial', 'Office suite'), base: 700000, yield: 0.065, vacate: 0.05 },
     { id: 'galpao', n: tr('Galpão logístico', 'Logistics warehouse'), base: 3000000, yield: 0.08, vacate: 0.03 },
     { id: 'predio', n: tr('Prédio corporativo', 'Office building'), base: 25000000, yield: 0.07, vacate: 0.04 },

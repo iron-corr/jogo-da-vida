@@ -17,12 +17,13 @@
   ];
 
   const LIFESTYLE = [
-    { n: tr('Quarto dividido', 'Shared room'), cost: 1200, emax: 100, regen: 25 },
-    { n: tr('Kitnet', 'Studio apartment'), cost: 2200, emax: 120, regen: 30 },
-    { n: tr('Apartamento 1 quarto', '1-bedroom apartment'), cost: 3800, emax: 140, regen: 36 },
-    { n: tr('Apartamento 2 quartos + carro', '2-bedroom apartment + car'), cost: 7000, emax: 170, regen: 44 },
-    { n: tr('Casa em condomínio', 'House in a gated community'), cost: 14000, emax: 210, regen: 54 },
-    { n: tr('Cobertura', 'Penthouse'), cost: 30000, emax: 260, regen: 66 },
+    // people = quantas pessoas cabem (você, cônjuge e filhos).
+    { n: tr('Quarto dividido', 'Shared room'), cost: 1200, emax: 100, regen: 25, people: 1 },
+    { n: tr('Kitnet', 'Studio apartment'), cost: 2200, emax: 120, regen: 30, people: 2 },
+    { n: tr('Apartamento 1 quarto', '1-bedroom apartment'), cost: 3800, emax: 140, regen: 36, people: 3 },
+    { n: tr('Apartamento 2 quartos + carro', '2-bedroom apartment + car'), cost: 7000, emax: 170, regen: 44, people: 4 },
+    { n: tr('Casa em condomínio', 'House in a gated community'), cost: 14000, emax: 210, regen: 54, people: 6 },
+    { n: tr('Cobertura', 'Penthouse'), cost: 30000, emax: 260, regen: 66, people: 10 },
   ];
 
   // Ordem de venda automática quando o caixa fica negativo: liquidez primeiro, risco por último.
@@ -64,6 +65,20 @@
       return !!n && S.job.employed && S.knowledge >= n.k && S.reputation >= n.rep;
     },
     moveCost: (S, i) => (i > S.lifestyle ? 2 * LIFESTYLE[i].cost * S.macro.priceIndex : 0),
+    // Quantas pessoas cabem onde você mora: a casa própria (se for residencial) ou o padrão de vida alugado.
+    capacity(S) {
+      const h = G.life.home(S), p = h && G.realty.prop(h.pid);
+      return p && p.people ? p.people : LIFESTYLE[S.lifestyle].people;
+    },
+    // Pessoas a mais do que cabem (0 = cabe todo mundo). Aperto dá stress e derruba o bem-estar.
+    crowded: S => Math.max(0, G.social.familySize(S) - W.capacity(S)),
+    fits: (S, i) => LIFESTYLE[i].people >= G.social.familySize(S),
+    // Avisa quando a família cresce e deixa de caber (chamado no casamento e no nascimento).
+    checkRoom(S) {
+      if (!W.crowded(S)) return;
+      G.news(tr(`A casa ficou apertada: ${G.social.familySize(S)} pessoas onde cabem ${W.capacity(S)}. Hora de mudar (Trabalho → Estilo de vida).`,
+        `Home is getting cramped: ${G.social.familySize(S)} people where ${W.capacity(S)} fit. Time to move (Work → Lifestyle).`), 'bad');
+    },
 
     // Gastar energia com o tanque baixo arrisca burnout.
     spend(S, cost) {
@@ -135,6 +150,7 @@
 
     setLifestyle(S, i) {
       if (i === S.lifestyle || !LIFESTYLE[i]) return;
+      if (i < S.lifestyle && !W.fits(S, i)) return; // não dá para reduzir para onde a família não cabe
       const c = W.moveCost(S, i);
       if (S.cash < c) return;
       S.cash -= c;

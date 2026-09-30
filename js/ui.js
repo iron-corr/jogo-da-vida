@@ -153,6 +153,17 @@
   }
 
 
+  // Por que um imóvel não serve de casa própria (vazio se serve).
+  function homeWhy(S, h) {
+    const p = G.realty.prop(h.pid), n = G.social.familySize(S);
+    switch (G.life.homeProblem(S, h)) {
+      case 'comercial': return tr('imóvel comercial: não dá para morar', 'commercial property: you can\'t live there');
+      case 'familia': return tr(`cabem ${p.people} pessoas e sua família tem ${n}`, `it fits ${p.people} people and your family has ${n}`);
+      case 'valor': return tr(`pequeno para o seu padrão de vida: precisa valer ${f.money(G.life.homeMin(S))}`, `too small for your lifestyle: must be worth ${f.money(G.life.homeMin(S))}`);
+    }
+    return '';
+  }
+
   // Explicações do painel lateral (aparecem ao passar o mouse).
   const TIPS = {
     cash: tr('Dinheiro parado na conta. Perde para a inflação; o que passar da reserva pode ir para investimentos.',
@@ -305,6 +316,9 @@
     { id: 'alvos', when: S => S.research.aporte_auto && !Object.values(S.auto.targets).some(v => v > 0),
       t: tr('Defina seus alvos em <b>Investimentos → Estratégia automática</b> e ligue o aporte automático.',
         'Set your targets in <b>Investments → Automatic strategy</b> and turn on automatic investing.') },
+    { id: 'apertado', when: S => G.work.crowded(S) > 0,
+      t: tr('Sua família não cabe mais onde você mora. Mude para um padrão maior em <b>Trabalho → Estilo de vida</b>: o aperto aumenta o stress e derruba o bem-estar.',
+        'Your family no longer fits where you live. Move up in <b>Work → Lifestyle</b>: cramped quarters raise stress and sink well-being.') },
     { id: 'habito', when: S => S.tabs.vida && !Object.keys(S.social.habits).length,
       t: tr('Na aba <b>Vida</b>, comece um hábito. Exercício e leitura se pagam rápido.', 'In the <b>Life</b> tab, start a habit. Exercise and reading pay off fast.') },
     { id: 'panico', when: S => S.social.pending && S.social.pending.type === 'panic',
@@ -415,7 +429,7 @@
             <table class="tbl">`;
           W.LIFESTYLE.forEach((l, i) => {
             const cur = i === S.lifestyle;
-            h += `<tr class="${cur ? 'cur' : ''}"><td>${l.n}</td><td id="ls-c-${i}"></td><td>${tr('energia', 'energy')} ${l.emax + bonusE}, +${l.regen}/${tr('dia', 'day')}</td>
+            h += `<tr class="${cur ? 'cur' : ''}"><td>${l.n}<br><small class="muted">${tr(`até ${l.people} ${l.people === 1 ? 'pessoa' : 'pessoas'}`, `up to ${l.people} ${l.people === 1 ? 'person' : 'people'}`)}</small></td><td id="ls-c-${i}"></td><td>${tr('energia', 'energy')} ${l.emax + bonusE}, +${l.regen}/${tr('dia', 'day')}</td>
               <td>${cur ? `<b>${tr('atual', 'current')}</b>` : `<button data-act="lifestyle" data-i="${i}" id="b-ls-${i}">${i > S.lifestyle ? tr('Mudar', 'Move') : tr('Reduzir', 'Downsize')}</button>`}</td></tr>`;
           });
           h += '</table>';
@@ -450,8 +464,7 @@
           const upkeep = LF.home(S) ? G.realty.value(S, LF.home(S)) * G.realty.VACANT_COST : 0;
           set('w-home', LF.homeOk(S) ? tr(`custo de vida −40% (${f.money(W.rentCost(S) - W.cost(S))}/mês); condomínio e IPTU: ${f.money(upkeep)}/mês.`,
             `cost of living −40% (${f.money(W.rentCost(S) - W.cost(S))}/month); building fees and property tax: ${f.money(upkeep)}/month.`)
-            : tr(`pequeno para o padrão atual (precisa valer ${f.money(LF.homeMin(S))}), sem desconto no custo de vida.`,
-              `too small for your current lifestyle (must be worth ${f.money(LF.homeMin(S))}), no cost-of-living discount.`));
+            : LF.home(S) ? `${homeWhy(S, LF.home(S))}${tr(', sem desconto no custo de vida.', ', no cost-of-living discount.')}` : '');
         }
         set('w-sal', f.money(W.salary(S)));
         set('w-ot', '+' + f.money(W.otGain(S)));
@@ -490,11 +503,13 @@
         set('w-burn', tr(`Em burnout: mais ${S.burnout} dia(s) de descanso.`, `Burned out: ${S.burnout} more day(s) of rest.`));
         if (S.tabs.estilo) {
           W.LIFESTYLE.forEach((l, i) => {
-            const rentI = l.cost * S.macro.priceIndex * W.costMult(S), home = G.life.home(S);
-            const own = home && G.realty.value(S, home) >= G.life.HOME_MIN * rentI ? 1 - G.life.HOME_SHARE : 1;
+            const rentI = l.cost * S.macro.priceIndex * W.costMult(S), home = G.life.home(S), hp = home && G.realty.prop(home.pid);
+            const own = hp && hp.people >= G.social.familySize(S) && G.realty.value(S, home) >= G.life.HOME_MIN * rentI ? 1 - G.life.HOME_SHARE : 1;
             set(`ls-c-${i}`, f.money(rentI * own) + tr('/mês', '/month'));
-            dis(`b-ls-${i}`, S.cash < W.moveCost(S, i));
-            why(`b-ls-${i}`, need(S, { cash: W.moveCost(S, i) }));
+            const small = i < S.lifestyle && !W.fits(S, i);
+            dis(`b-ls-${i}`, small || S.cash < W.moveCost(S, i));
+            why(`b-ls-${i}`, small ? tr(`sua família tem ${G.social.familySize(S)} pessoas; aqui cabem ${l.people}`,
+              `your family has ${G.social.familySize(S)} people; this fits ${l.people}`) : need(S, { cash: W.moveCost(S, i) }));
           });
         }
       },
@@ -863,7 +878,7 @@
             <button data-act="marry" data-id="1" id="b-m1">${tr('Casamento de revista', 'Society-page wedding')} <small id="v-m1"></small></button>`;
         } else h += `<button data-act="kid" id="b-kid">${tr('Ter um filho', 'Have a child')} <small id="v-kid"></small></button>`;
         if (f.kids) h += `<button data-act="school">${f.school ? tr('Tirar da escola particular', 'Leave private school') : tr('Escola particular', 'Private school')} <small id="v-sch"></small></button>`;
-        h += '</div><p id="v-kidst"></p></section>';
+        h += '</div><p id="v-kidst"></p><p id="v-house"></p></section>';
         return h;
       },
       update(S) {
@@ -918,6 +933,11 @@
           : ks === 'recovering' ? tr(`Recuperação do parto: dá para tentar outro filho em ~${months(fam.nextKid)} mês(es).`,
             `Recovering from the birth: you can try for another child in ~${months(fam.nextKid)} month(s).`) : '';
         set('v-kidst', fam.married || ks === 'pregnant' ? kidMsg : '');
+        const crowd = G.work.crowded(S), house = $('v-house');
+        set('v-house', tr(`Em casa: ${SO.familySize(S)} ${SO.familySize(S) === 1 ? 'pessoa' : 'pessoas'}; onde você mora cabem ${G.work.capacity(S)}.`,
+          `At home: ${SO.familySize(S)} ${SO.familySize(S) === 1 ? 'person' : 'people'}; where you live fits ${G.work.capacity(S)}.`) +
+          (crowd ? tr(' Apertado: mais stress e menos bem-estar. Mude em Trabalho → Estilo de vida.', ' Cramped: more stress and less well-being. Move in Work → Lifestyle.') : ''));
+        if (house) house.className = crowd ? 'bad' : 'muted';
         dis('b-kid', ks !== 'ready' || S.cash < SO.KID_COST * pi);
         why('b-m0', need(S, { cash: 60000 * pi }));
         why('b-m1', need(S, { cash: 800000 * pi }));
@@ -1513,7 +1533,8 @@
           <p class="muted">On purchase: 3% transfer tax (ITBI) and notary fees. On sale: 6% realtor fee, 15% income tax on the gain and months until a buyer shows up.
           Rent pays 8% to the property manager and 15% income tax; a vacant property costs building fees and property tax.</p><table class="tbl">`);
         for (const p of G.PROPERTIES) {
-          h += `<tr><td>${p.n}<br><small class="muted">${tr('aluguel', 'rent')} ~${f.pct(p.yield, 1)} ${tr('a.a.', 'p.a.')}</small></td><td id="re-p-${p.id}"></td>
+          h += `<tr><td>${p.n}<br><small class="muted">${tr('aluguel', 'rent')} ~${f.pct(p.yield, 1)} ${tr('a.a.', 'p.a.')} · ${p.people
+            ? tr(`moradia para até ${p.people} pessoas`, `home for up to ${p.people} people`) : tr('comercial', 'commercial')}</small></td><td id="re-p-${p.id}"></td>
             <td class="ops"><button data-act="re-buy" data-id="${p.id}" id="b-re-${p.id}">${tr('À vista', 'Pay cash')} <small id="re-c-${p.id}"></small></button>
             ${fin ? `<button data-act="re-fin" data-id="${p.id}" id="b-rf-${p.id}">${tr('Financiar', 'Finance')} <small id="re-f-${p.id}"></small></button>` : ''}</td></tr>`;
         }
@@ -1524,7 +1545,7 @@
             h += `<tr><td>${R.prop(x.pid).n}<br><small class="muted" id="rh-s-${i}"></small></td>
               <td><b id="rh-v-${i}"></b><br><small id="rh-pl-${i}"></small></td><td><small id="rh-l-${i}"></small></td>
               <td>${x.selling ? '' : `<button data-act="re-sell" data-i="${i}">${tr('Vender', 'Sell')}</button>`}
-                ${x.home ? `<br><small class="good">${tr('você mora aqui', 'you live here')}</small>` : !x.selling && !x.occupied ? `<br><button data-act="home" data-i="${i}" id="b-home-${i}">${tr('Morar aqui', 'Live here')}</button>` : ''}</td></tr>`;
+                ${x.home ? `<br><small class="good">${tr('você mora aqui', 'you live here')}</small>` : !x.selling && !x.occupied && R.prop(x.pid).people ? `<br><button data-act="home" data-i="${i}" id="b-home-${i}">${tr('Morar aqui', 'Live here')}</button>` : ''}</td></tr>`;
           });
           h += '</table></section>';
         }
@@ -1553,9 +1574,9 @@
           const v = R.value(S, x);
           set(`rh-s-${i}`, x.selling ? tr(`à venda: ~${x.selling} dias para fechar`, `for sale: ~${x.selling} days to close`) : x.home ? tr('sua casa', 'your home')
             : x.occupied ? tr(`alugado · ${f.money(R.rent(S, x))}/mês bruto`, `rented · ${f.money(R.rent(S, x))}/month gross`) : tr('vago, procurando inquilino', 'vacant, looking for a tenant'));
-          const small = v < G.life.homeMin(S);
-          dis(`b-home-${i}`, small);
-          why(`b-home-${i}`, small ? tr(`pequeno para o seu padrão de vida: precisa valer ${f.money(G.life.homeMin(S))}`, `too small for your lifestyle: must be worth ${f.money(G.life.homeMin(S))}`)
+          const problem = G.life.homeProblem(S, x);
+          dis(`b-home-${i}`, !!problem);
+          why(`b-home-${i}`, problem ? homeWhy(S, x)
             : tr('para de alugar e corta 40% do custo de vida', 'stop renting and cut 40% of your cost of living'));
           set(`rh-v-${i}`, f.money(v));
           const pl = $(`rh-pl-${i}`);

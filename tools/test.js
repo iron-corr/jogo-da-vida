@@ -382,7 +382,7 @@ S.pol.passed.subsidio = { sector: 'varejo', until: S.day + 1440 };
 eq('padaria subsidiada lucra +15%', G.business.monthlyProfit(S) / p44, 1.15);
 
 // 45) bem-estar: base 50 − stress/2, casado +8, pet +4; vira pontos de legado
-S = G.newState(45); S.social.stress = 20; S.social.family.married = true; S.life.pet = { name: 'X', born: 0, dies: 1e9 };
+S = G.newState(45); S.lifestyle = 1; S.social.stress = 20; S.social.family.married = true; S.life.pet = { name: 'X', born: 0, dies: 1e9 };
 eq('índice de bem-estar', G.life.wellbeing(S), 50 - 10 + 8 + 4);
 S.life.wellSum = 70 * 720; S.life.wellN = 720; S.day = 60 * 360;
 eq('PL por uma vida boa (média 70, 60 anos)', G.life.wellPoints(S), 22);
@@ -406,6 +406,26 @@ eq('gastos do mês = custo de vida + condomínio/IPTU', G.work.outflow(S), G.wor
 S.social.family.married = true; S.social.family.kids = 2; S.life.city = 'sp';
 eq('kitnet pequena para família em SP', G.life.homeOk(S) ? 1 : 0, 0);
 eq('imóvel mínimo = 80× o custo pagando aluguel', G.life.homeMin(S) / G.work.rentCost(S), 80);
+
+// 47b) a família precisa caber onde mora
+S = G.newState(471); S.cash = 1e7; S.lifestyle = 1; // kitnet: até 2 pessoas
+S.social.family.married = true; S.social.family.kids = 2;
+eq('família de 4 numa kitnet: 2 a mais', G.work.crowded(S), 2);
+const roomy = G.newState(471); Object.assign(roomy, { cash: 1e7, lifestyle: 3 }); roomy.social.family.married = true; roomy.social.family.kids = 2;
+G.social.monthly(S); G.social.monthly(roomy);
+eq('aperto: +6 de stress no mês (3 por pessoa a mais)', S.social.stress - roomy.social.stress, 6);
+eq('aperto: −10 de bem-estar (e −3 pelo stress a mais)', G.life.wellbeing(roomy) - G.life.wellbeing(S), 10 + 3);
+G.work.setLifestyle(S, 3); eq('mudou para apartamento de 2 quartos', S.lifestyle, 3);
+eq('família de 4 cabe no apartamento de 2 quartos', G.work.crowded(S), 0);
+G.work.setLifestyle(S, 1); eq('não dá para voltar para a kitnet com 4 pessoas', S.lifestyle, 3);
+S.research.imoveis = true; S.market.prices.imob = 100;
+G.realty.buy(S, 'kitnet', false); G.life.moveIn(S, 0);
+eq('não dá para morar numa kitnet própria com 4 pessoas', S.realty[0].home ? 1 : 0, 0);
+eq('motivo: família não cabe', G.life.homeProblem(S, S.realty[0]) === 'familia' ? 1 : 0, 1);
+G.realty.buy(S, 'galpao', false);
+eq('galpão não serve de casa', G.life.homeProblem(S, S.realty[1]) === 'comercial' ? 1 : 0, 1);
+G.realty.buy(S, 'casa', false); G.life.moveIn(S, 2);
+eq('casa em condomínio própria serve para 4 pessoas', G.life.homeOk(S) ? 1 : 0, 1);
 
 // 48) coleção entra no patrimônio; leilão cobra 10% e IR sobre o ganho
 S = G.newState(48); S.cash = 100000; const nw48 = G.portfolio.netWorth(S);

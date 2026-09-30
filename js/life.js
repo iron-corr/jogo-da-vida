@@ -123,14 +123,22 @@
     // ---------- casa própria ----------
     home: S => S.realty.find(h => h.home),
     homeMin: S => HOME_MIN * G.work.rentCost(S),
+    // Um imóvel serve de casa se for residencial, couber a família e valer o bastante para o padrão de vida.
+    // Devolve '' se serve, ou o motivo: 'comercial', 'familia' ou 'valor'.
+    homeProblem(S, h) {
+      const p = G.realty.prop(h.pid);
+      if (!p.people) return 'comercial';
+      if (p.people < G.social.familySize(S)) return 'familia';
+      return G.realty.value(S, h) < L.homeMin(S) ? 'valor' : '';
+    },
     homeOk(S) {
       const h = L.home(S);
-      return !!h && G.realty.value(S, h) >= L.homeMin(S);
+      return !!h && !L.homeProblem(S, h);
     },
     moveIn(S, i) {
       const h = S.realty[i];
       if (!h || h.selling || h.occupied || h.home) return;
-      if (G.realty.value(S, h) < L.homeMin(S)) return;
+      if (L.homeProblem(S, h)) return;
       for (const x of S.realty) x.home = false;
       h.home = true;
       G.social.addStress(S, -5);
@@ -249,6 +257,7 @@
       for (const id in lf.hobbies) w += HOBBIES[id].well * (lf.hobbies[id].lastRate ?? 1);
       if (!S.job.employed && !S.job.retired) w -= 10;
       if (S.cash < 0) w -= 10;
+      w -= 5 * G.work.crowded(S);
       return clamp(w, 0, 100);
     },
     avgWell: S => (S.life && S.life.wellN ? S.life.wellSum / S.life.wellN : 0),
