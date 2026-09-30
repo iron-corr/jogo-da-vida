@@ -24,7 +24,7 @@
   const index = S => S.market.prices.imob / 100;
 
   const R = G.realty = {
-    ITBI, BROKER, DOWN,
+    ITBI, BROKER, DOWN, VACANT_COST,
     prop,
     price: (S, p) => p.base * index(S),
     loanRate: S => S.macro.selic + G.politics.loanSpread(S),
@@ -44,14 +44,16 @@
     equity(S) {
       return S.realty.reduce((s, h) => s + R.value(S, h) - (h.loan ? h.loan.bal : 0), 0);
     },
-    // Fluxo mensal esperado: aluguel líquido dos imóveis ocupados menos parcelas.
+    // Fluxo mensal esperado: aluguel líquido dos imóveis ocupados, parcelas e condomínio + IPTU
+    // (pagos pelo dono no imóvel vago e na casa onde mora; no alugado, quem paga é o inquilino).
     monthlyNet(S) {
-      let rent = 0, pmt = 0;
+      let rent = 0, pmt = 0, upkeep = 0;
       for (const h of S.realty) {
         if (h.occupied && !h.selling && !h.home) rent += R.rent(S, h) * (1 - ADMIN) * 0.85;
+        if (h.home || !h.occupied) upkeep += R.value(S, h) * VACANT_COST;
         if (h.loan) pmt += h.loan.pmt;
       }
-      return { rent, pmt };
+      return { rent, pmt, upkeep };
     },
 
     buy(S, pid, financed) {

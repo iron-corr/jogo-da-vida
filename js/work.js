@@ -39,8 +39,11 @@
     salaryMult: S => (S.research.negociacao ? 1.1 : 1) * (S.research.mba ? 1.1 : 1) * (S.research.cfa ? 1.15 : 1)
       * (S.job.bonus || 1) * W.trackMult(S) * G.life.salaryMult(S),
     salary: S => CAREER[S.job.level].sal * S.job.wageIndex * W.salaryMult(S),
+    // costMult não inclui a casa própria: rentCost é o custo de vida pagando aluguel; cost já desconta a moradia
+    // quando você mora num imóvel seu grande o bastante (ver life.homeMult).
     costMult: S => (S.research.orcamento ? 0.95 : 1) * (S.research.minimalismo ? 0.9 : 1) * G.social.costMult(S) * G.life.costMult(S),
-    cost: S => LIFESTYLE[S.lifestyle].cost * S.macro.priceIndex * W.costMult(S),
+    rentCost: S => LIFESTYLE[S.lifestyle].cost * S.macro.priceIndex * W.costMult(S),
+    cost: S => W.rentCost(S) * G.life.homeMult(S),
     emax: S => LIFESTYLE[S.lifestyle].emax + (S.research.saude ? 15 : 0) + G.social.emaxAdd(S) - G.life.ageDrain(S),
     regen: S => (LIFESTYLE[S.lifestyle].regen + G.social.regenAdd(S)) * G.social.regenMult(S),
     otGain: S => W.salary(S) / 100,
@@ -97,7 +100,7 @@
     // Renda que entra sem trabalhar: juros, dividendos, aluguéis, empresas e gestora.
     passiveIncome(S) {
       const re = G.realty.monthlyNet(S);
-      return G.portfolio.monthlyYield(S) + re.rent - re.pmt + G.business.monthlyProfit(S) - G.business.monthlyPayments(S) + G.agro.monthlyExpected(S) + (S.fund ? S.fund.lastProfit : 0);
+      return G.portfolio.monthlyYield(S) + re.rent - re.pmt - re.upkeep + G.business.monthlyProfit(S) - G.business.monthlyPayments(S) + G.agro.monthlyExpected(S) + (S.fund ? S.fund.lastProfit : 0);
     },
     fireNumber: S => 25 * 12 * W.cost(S),
     canRetire: S => !!S.research.fire && S.job.employed && W.passiveIncome(S) >= W.cost(S),
@@ -234,7 +237,8 @@
     // Tudo que sai do caixa todo mês: custo de vida, financiamentos, clubes, escola e política.
     outflow(S) {
       const PL = G.politics;
-      return W.cost(S) + G.realty.monthlyNet(S).pmt + G.business.monthlyPayments(S) + G.social.clubFees(S) + G.social.schoolCost(S)
+      const re = G.realty.monthlyNet(S);
+      return W.cost(S) + re.pmt + re.upkeep + G.business.monthlyPayments(S) + G.social.clubFees(S) + G.social.schoolCost(S)
         + PL.mediaUpkeep(S) + PL.thinkTankCost(S) + PL.entityFees(S) + G.social.partilhaPayment(S) + G.agro.monthlyCost(S) + G.life.monthlyCost(S);
     },
 

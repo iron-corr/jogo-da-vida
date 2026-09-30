@@ -54,7 +54,10 @@
       d: tr('Salário −10%, mas mar todo dia: menos stress e mais bem-estar.', 'Salary −10%, but the sea every day: less stress and more well-being.') },
   };
   const HOME_SHARE = 0.4; // parte do custo de vida que é moradia
-  const HOME_MIN = 60;    // o imóvel precisa valer 60× o custo mensal do padrão
+  // O imóvel precisa valer 80× o custo de vida mensal pagando aluguel (padrão, família, cidade e hábitos incluídos):
+  // assim o aluguel que se deixa de pagar (40% do custo) equivale a 0,5% ao mês do valor do imóvel, ~6% ao ano,
+  // em linha com o aluguel dos imóveis residenciais do jogo (kitnet 6%, apartamento 4,5%).
+  const HOME_MIN = 80;
 
   const SECOND = [
     { id: 'praia', n: tr('Casa de praia', 'Beach house'), base: 900000 },
@@ -72,7 +75,7 @@
   const PET_COST = 400, PET_ADOPT = 2000;
 
   const L = G.life = {
-    HOBBIES, COLLECTIONS, LOTS, DESTINATIONS, CITIES, SECOND, PLANS, HOME_MIN,
+    HOBBIES, COLLECTIONS, LOTS, DESTINATIONS, CITIES, SECOND, PLANS, HOME_MIN, HOME_SHARE,
     init: () => ({
       hobbies: {}, collections: [], second: [], away: 0, vacYear: null, lastDest: null, bucket: {},
       city: 'bh', health: 'nenhum', healthBonus: false, pet: null,
@@ -88,9 +91,9 @@
     costMult(S) {
       let m = L.city(S).cost;
       if (S.life.hobbies.culinaria) m *= HOBBIES.culinaria.costMult;
-      if (L.homeOk(S)) m *= 1 - HOME_SHARE;
       return m;
     },
+    homeMult: S => (L.homeOk(S) ? 1 - HOME_SHARE : 1),
     medMult: S => PLANS[S.life.health].med,
     // Perda de energia máxima com a idade: 1 por ano depois dos 45, até 30. Exercício ou corrida cortam pela metade.
     ageDrain(S) {
@@ -119,7 +122,7 @@
 
     // ---------- casa própria ----------
     home: S => S.realty.find(h => h.home),
-    homeMin: S => HOME_MIN * G.work.LIFESTYLE[S.lifestyle].cost * pi(S),
+    homeMin: S => HOME_MIN * G.work.rentCost(S),
     homeOk(S) {
       const h = L.home(S);
       return !!h && G.realty.value(S, h) >= L.homeMin(S);

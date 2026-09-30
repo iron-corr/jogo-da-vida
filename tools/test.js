@@ -400,6 +400,12 @@ G.realty.buy(S, 'kitnet', false); G.life.moveIn(S, 0);
 eq('custo de vida morando no próprio imóvel', G.work.cost(S) / cost47, 0.6);
 eq('imóvel onde mora não rende aluguel', G.realty.monthlyNet(S).rent, 0);
 S.lifestyle = 5; eq('cobertura: kitnet pequena demais, sem desconto', G.life.homeOk(S) ? 1 : 0, 0);
+S.lifestyle = 0; eq('condomínio e IPTU da casa entram nos gastos do mês', G.realty.monthlyNet(S).upkeep, 180000 * 0.001);
+eq('gastos do mês = custo de vida + condomínio/IPTU', G.work.outflow(S), G.work.cost(S) + 180);
+// o imóvel mínimo acompanha família e cidade: a mesma kitnet não serve para casal com 2 filhos em SP
+S.social.family.married = true; S.social.family.kids = 2; S.life.city = 'sp';
+eq('kitnet pequena para família em SP', G.life.homeOk(S) ? 1 : 0, 0);
+eq('imóvel mínimo = 80× o custo pagando aluguel', G.life.homeMin(S) / G.work.rentCost(S), 80);
 
 // 48) coleção entra no patrimônio; leilão cobra 10% e IR sobre o ganho
 S = G.newState(48); S.cash = 100000; const nw48 = G.portfolio.netWorth(S);

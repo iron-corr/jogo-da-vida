@@ -181,7 +181,8 @@
     sal: tr('Salário do cargo atual, reajustado pela inflação todo janeiro.', 'Salary of your current position, adjusted for inflation every January.'),
     yield: tr('Juros, dividendos e aluguéis de FIIs esperados por mês (sem contar a variação de preço).',
       'Interest, dividends and REIT rents expected per month (not counting price changes).'),
-    rent: tr('Aluguel líquido dos imóveis ocupados.', 'Net rent from occupied properties.'),
+    rent: tr('Aluguel líquido dos imóveis alugados, menos condomínio e IPTU dos vagos e da casa onde você mora.',
+      'Net rent from rented properties, minus building fees and property tax on vacant ones and on the home you live in.'),
     agro: tr('Arrendamentos e gado por mês. As safras de soja e café entram de uma vez na colheita.',
       'Land leases and cattle per month. Soy and coffee crops come in all at once at harvest.'),
     loan: tr('Parcelas dos financiamentos de imóveis (taxa fixa) e de empresas (acompanham a Selic).',
@@ -446,7 +447,9 @@
             dis(`b-city-${id}`, S.cash < LF.cityCost(S, id));
             why(`b-city-${id}`, need(S, { cash: LF.cityCost(S, id) }));
           }
-          set('w-home', LF.homeOk(S) ? tr('custo de vida −40%.', 'cost of living −40%.')
+          const upkeep = LF.home(S) ? G.realty.value(S, LF.home(S)) * G.realty.VACANT_COST : 0;
+          set('w-home', LF.homeOk(S) ? tr(`custo de vida −40% (${f.money(W.rentCost(S) - W.cost(S))}/mês); condomínio e IPTU: ${f.money(upkeep)}/mês.`,
+            `cost of living −40% (${f.money(W.rentCost(S) - W.cost(S))}/month); building fees and property tax: ${f.money(upkeep)}/month.`)
             : tr(`pequeno para o padrão atual (precisa valer ${f.money(LF.homeMin(S))}), sem desconto no custo de vida.`,
               `too small for your current lifestyle (must be worth ${f.money(LF.homeMin(S))}), no cost-of-living discount.`));
         }
@@ -487,7 +490,9 @@
         set('w-burn', tr(`Em burnout: mais ${S.burnout} dia(s) de descanso.`, `Burned out: ${S.burnout} more day(s) of rest.`));
         if (S.tabs.estilo) {
           W.LIFESTYLE.forEach((l, i) => {
-            set(`ls-c-${i}`, f.money(l.cost * S.macro.priceIndex * W.costMult(S)) + tr('/mês', '/month'));
+            const rentI = l.cost * S.macro.priceIndex * W.costMult(S), home = G.life.home(S);
+            const own = home && G.realty.value(S, home) >= G.life.HOME_MIN * rentI ? 1 - G.life.HOME_SHARE : 1;
+            set(`ls-c-${i}`, f.money(rentI * own) + tr('/mês', '/month'));
             dis(`b-ls-${i}`, S.cash < W.moveCost(S, i));
             why(`b-ls-${i}`, need(S, { cash: W.moveCost(S, i) }));
           });
@@ -1712,7 +1717,7 @@
     set('r-fund', f.money(fd));
     show('row-biz', bz !== 0);
     show('row-fund', !!S.fund);
-    set('r-rent', f.money(re.rent));
+    set('r-rent', f.money(re.rent - re.upkeep));
     set('r-agro', f.money(agro));
     show('row-agro', S.agro.lands.length > 0);
     set('r-loan', '−' + f.money(loans));
