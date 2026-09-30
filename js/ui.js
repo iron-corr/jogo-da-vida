@@ -478,8 +478,12 @@
         why('b-ot', need(S, { energy: W.OT_COST }));
         dis('b-study', !W.canAct(S, W.studyCost(S)));
         why('b-study', need(S, { energy: W.studyCost(S) }));
-        dis('b-search', !W.canAct(S, W.SEARCH_COST));
-        why('b-search', need(S, { energy: W.SEARCH_COST }));
+        const sb = W.searchBlock(S);
+        dis('b-search', !!sb || !W.canAct(S, W.SEARCH_COST));
+        why('b-search', sb === 'cedo' ? tr(`processos seletivos levam no mínimo 1 mês: respostas a partir de ${f.date(W.hireFrom(S))}`,
+          `hiring takes at least a month: answers from ${f.date(W.hireFrom(S))} on`)
+          : sb === 'hoje' ? tr('você já mandou currículos hoje; tente amanhã', 'you already sent out résumés today; try tomorrow')
+          : need(S, { energy: W.SEARCH_COST }));
         if (S.research.rotina) {
           // Estimativa do que o piloto faz por dia com a energia que sobra das empresas.
           const free = W.freeEnergy(S), r = S.routine;
@@ -1240,7 +1244,8 @@
     legado: {
       key(S) {
         const L = S.legacy;
-        return [L.generation, Object.keys(L.ach).length, JSON.stringify(L.up), S.social.family.kids > 0, G.legacy.age(S) >= G.legacy.HEIR_AGE].join('|');
+        return [L.generation, Object.keys(L.ach).length, JSON.stringify(L.up), S.social.family.kids > 0, G.legacy.age(S) >= G.legacy.HEIR_AGE,
+          G.legacy.elders(S).length, L.history.map(g => g.died || '').join()].join('|');
       },
       build(S) {
         const LG = G.legacy, L = S.legacy;
@@ -1250,16 +1255,23 @@
           <p>Se passasse o bastão hoje: <b id="l-gain"></b> pontos de legado
           <span class="muted">(raiz do patrimônio real + prestígio + bem-estar da vida; sem filhos, a fortuna vai para uma fundação e metade se perde)</span>.</p>
           <p>Bem-estar médio desta vida: <b id="l-well"></b> <span class="muted">(acima de 40, cada ponto rende legado; hoje vale <span id="l-wellpts"></span> pontos)</span></p>
-          <p>Seu herdeiro receberia <b id="l-heir"></b> <span class="muted">(${G.fmt.pct(LG.heirShare(S), 0)} do patrimônio, menos 8% de ITCMD)</span>
-          e recomeçaria como estagiário, no mesmo mundo e no mesmo ano.</p>`,
+          <p>Se você morrer, seu herdeiro recebe <b id="l-heir"></b> de uma vez <span class="muted">(${G.fmt.pct(LG.heirShare(S), 0)} do patrimônio, menos 8% de ITCMD)</span>.
+          Se você se aposentar, ele recebe <b id="l-gift"></b> agora, como doação em vida, e <b id="l-kept"></b> ficam com você: rendem, pagam seu custo de vida
+          e o que sobrar vira herança quando você morrer. Nos dois casos ele recomeça como estagiário, no mesmo mundo e no mesmo ano.</p>`,
           `<section class="card summary"><span>Generation <b>${L.generation}</b></span><span>Age <b id="l-age"></b></span>
           <span>Health <b id="l-health"></b></span><span>Legacy points <b id="l-lp"></b></span></section>
           <section class="card"><h3>Succession</h3>
           <p>If you passed the torch today: <b id="l-gain"></b> legacy points
           <span class="muted">(square root of real net worth + prestige + lifetime well-being; without children, the fortune goes to a foundation and half is lost)</span>.</p>
           <p>Average well-being this life: <b id="l-well"></b> <span class="muted">(above 40, each point earns legacy; currently worth <span id="l-wellpts"></span> points)</span></p>
-          <p>Your heir would receive <b id="l-heir"></b> <span class="muted">(${G.fmt.pct(LG.heirShare(S), 0)} of net worth, minus 8% inheritance tax)</span>
-          and would start over as an intern, in the same world and the same year.</p>`);
+          <p>If you die, your heir receives <b id="l-heir"></b> all at once <span class="muted">(${G.fmt.pct(LG.heirShare(S), 0)} of net worth, minus 8% inheritance tax)</span>.
+          If you retire, they receive <b id="l-gift"></b> now, as a lifetime gift, and <b id="l-kept"></b> stay with you: it earns returns, pays your cost of living
+          and whatever is left becomes an inheritance when you die. Either way they start over as an intern, in the same world and the same year.</p>`);
+        const elders = LG.elders(S);
+        if (elders.length) {
+          h += `<p>${tr('Gerações anteriores vivas', 'Living previous generations')}:</p><ul>` + elders.map((e, i) =>
+            `<li>${tr(`${e.gen}ª geração, aposentada`, `Generation ${e.gen}, retired`)}: <span id="l-el-${i}"></span></li>`).join('') + '</ul>';
+        }
         if (S.social.family.kids === 0) h += tr('<p class="bad">Você ainda não tem filhos (aba Vida → Família).</p>', '<p class="bad">You have no children yet (Life tab → Family).</p>');
         h += LG.age(S) >= LG.HEIR_AGE
           ? `<button data-act="succeed">${tr('Aposentar e passar o bastão', 'Retire and pass the torch')}</button>`
@@ -1298,7 +1310,9 @@
           h += tr('<section class="card"><h3>Dinastia</h3><table class="tbl"><tr><td><b>Geração</b></td><td><b>Anos</b></td><td><b>Patrimônio final (R$ de 2026)</b></td><td><b>Pontos</b></td></tr>',
             '<section class="card"><h3>Dynasty</h3><table class="tbl"><tr><td><b>Generation</b></td><td><b>Years</b></td><td><b>Final net worth (2026 R$)</b></td><td><b>Points</b></td></tr>');
           for (const g of L.history) {
-            h += `<tr><td>${tr(`${g.gen}ª`, `#${g.gen}`)}</td><td>${g.from}–${g.to} (${g.reason === 'morte' ? tr(`morreu aos ${g.age}`, `died at ${g.age}`) : tr(`aposentou aos ${g.age}`, `retired at ${g.age}`)})</td><td>${f.money(g.nw)}</td><td>+${g.lp}</td></tr>`;
+            const fate = g.reason === 'morte' ? tr(`morreu aos ${g.age}`, `died at ${g.age}`)
+              : tr(`aposentou aos ${g.age}`, `retired at ${g.age}`) + (g.died ? tr(`, morreu aos ${g.died}`, `, died at ${g.died}`) : '');
+            h += `<tr><td>${tr(`${g.gen}ª`, `#${g.gen}`)}</td><td>${g.from}–${g.to} (${fate})</td><td>${f.money(g.nw)}</td><td>+${g.lp}</td></tr>`;
           }
           h += '</table></section>';
         }
@@ -1324,7 +1338,12 @@
         set('st-angel', f.money(st.angelOut || 0));
         set('st-tax', f.money(S.tax.paid));
         set('st-don', f.money(S.social.donated));
-        set('l-heir', f.money(S.social.family.kids ? Math.max(0, G.portfolio.netWorth(S)) * LG.heirShare(S) * 0.92 : 0));
+        set('l-heir', f.money(LG.handover(S, 'morte').now));
+        const ret = LG.handover(S, 'aposentadoria');
+        set('l-gift', f.money(ret.now));
+        set('l-kept', f.money(ret.kept));
+        LG.elders(S).forEach((e, i) => set(`l-el-${i}`, tr(`${Math.floor(e.age + (S.day - e.since) / 360)} anos, patrimônio ${f.money(e.estate)}`,
+          `age ${Math.floor(e.age + (S.day - e.since) / 360)}, estate ${f.money(e.estate)}`)));
         for (const u of LG.UPGRADES) {
           const cost = LG.upgradeCost(S, u);
           dis(`b-lu-${u.id}`, cost === undefined || S.legacy.lp < cost);
@@ -1859,8 +1878,8 @@
       case 'angel': G.angel.invest(S, +b.dataset.i); break;
       case 'retire': W.retire(S); break;
       case 'succeed':
-        if (confirm(tr('Aposentar e passar o bastão para o herdeiro? Seu personagem sai de cena e a próxima geração começa agora.',
-          'Retire and pass the torch to your heir? Your character leaves the stage and the next generation starts now.'))) G.legacy.succeed(S, 'aposentadoria');
+        if (confirm(tr('Aposentar e passar o bastão para o herdeiro? Seu personagem sai de cena e a próxima geração começa agora. Metade da parte do herdeiro vai agora; a outra metade fica com você e vira herança quando você morrer.',
+          'Retire and pass the torch to your heir? Your character leaves the stage and the next generation starts now. Half of the heir\'s share goes now; the other half stays with you and becomes an inheritance when you die.'))) G.legacy.succeed(S, 'aposentadoria');
         break;
       case 'legacy-up': G.legacy.buyUpgrade(S, id); break;
       case 'chart': zoom = id; break;

@@ -129,9 +129,14 @@ S.routine = 'misto'; S.energy = 100; cash0 = S.cash; S.knowledge = 0; G.work.aut
 eq('piloto misto: estuda e faz hora extra', S.knowledge > 0 && S.cash > cash0 ? 1 : 0, 1);
 
 // 18) piloto desempregado procura emprego mesmo no modo "estudar"
-S = G.newState(18); S.research = { rotina: 1 }; S.routine = 'estudar'; S.job.employed = false; S.reputation = 400;
-for (let d = 0; d < 60 && !S.job.employed; d++) { G.work.daily(S); G.work.autopilot(S); }
+S = G.newState(18); S.research = { rotina: 1 }; S.routine = 'estudar'; S.reputation = 400; G.work.loseJob(S);
+for (let d = 0; d < 360 && !S.job.employed; d++) { S.day++; G.work.daily(S); G.work.autopilot(S); }
 eq('piloto achou emprego', S.job.employed ? 1 : 0, 1);
+eq('piloto: recontratado só depois de 1 mês', S.job.since >= 30 ? 1 : 0, 1);
+const k18 = S.knowledge;
+S = G.newState(181); S.research = { rotina: 1 }; S.routine = 'hora_extra'; G.work.loseJob(S);
+S.day++; G.work.daily(S); G.work.autopilot(S);
+eq('piloto estuda enquanto não pode procurar emprego', S.knowledge > 0 ? 1 : 0, 1);
 
 // 19) dívida acima do limite do cheque especial paga 2% a.m., não 8%
 S = G.newState(19); S.cash = -100000; S.job.employed = false; S.job.retired = true;
@@ -246,7 +251,22 @@ const selic31 = S.macro.selic, lp31 = G.legacy.points(S);
 const heir = G.legacy.succeed(S, 'aposentadoria');
 eq('herdeiro no mesmo dia do mundo', heir.day, 20000);
 eq('mesma Selic', heir.macro.selic, selic31);
-eq('herança 30% com 8% de ITCMD', heir.cash - 300 * heir.macro.priceIndex, 1e8 * 0.3 * 0.92);
+eq('aposentadoria: doação em vida de metade dos 30%, com ITCMD', heir.cash - 300 * heir.macro.priceIndex, 1e8 * 0.3 * 0.5 * 0.92);
+const elder31 = heir.legacy.elders[0];
+eq('a outra metade fica com a geração aposentada', elder31.estate, 1e8 * 0.3 * 0.5);
+elder31.cost = 0; const est31 = elder31.estate, infl31 = heir.macro.infl;
+G.legacy.eldersMonthly(heir);
+eq('patrimônio aposentado rende inflação + 3% a.a.', elder31.estate / est31, Math.pow((1 + infl31) * 1.03, 1 / 12));
+const day31 = heir.day; heir.day = elder31.dies; const cash31 = heir.cash, est31b = elder31.estate * Math.pow((1 + heir.macro.infl) * 1.03, 1 / 12);
+G.legacy.eldersMonthly(heir);
+eq('na morte, herança do que sobrou, com ITCMD', heir.cash - cash31, est31b * 0.92);
+eq('geração aposentada sai da lista', heir.legacy.elders.length, 0);
+eq('dinastia registra a idade da morte', heir.legacy.history[0].died > 22 ? 1 : 0, 1);
+heir.day = day31;
+S = G.newState(311); S.day = 20000; S.cash = 1e8; S.social.family.kids = 1;
+const heirD = G.legacy.succeed(S, 'morte');
+eq('morte: herança inteira de uma vez', heirD.cash - 300 * heirD.macro.priceIndex, 1e8 * 0.3 * 0.92);
+eq('morte: ninguém fica com patrimônio', heirD.legacy.elders.length, 0);
 eq('PL somados', heir.legacy.lp, lp31);
 eq('geração 2', heir.legacy.generation, 2);
 eq('idade do herdeiro', G.legacy.age(heir), 22);
@@ -368,6 +388,16 @@ const heir42 = G.legacy.succeed(S, 'aposentadoria');
 eq('alvos preservados', heir42.auto.targets.ibov, 60);
 eq('piloto preservado', heir42.routine === 'misto' ? 1 : 0, 1);
 eq('reinvestir preservado', heir42.settings.reinvest ? 1 : 0, 1);
+
+// 42b) recolocação: no mínimo 1 mês depois da demissão, uma rodada de currículos por dia
+S = G.newState(421); S.reputation = 100; S.energy = 1000; G.work.loseJob(S);
+const chance421 = G.rng.chance; G.rng.chance = () => true;
+G.work.search(S); eq('sem contratação no 1º mês', S.job.employed ? 1 : 0, 0);
+S.day += 29; G.work.search(S); eq('nem no 29º dia', S.job.employed ? 1 : 0, 0);
+S.day += 1; G.work.search(S); eq('contratação possível a partir do 30º dia', S.job.employed ? 1 : 0, 1);
+G.work.loseJob(S); S.day += 30; G.rng.chance = () => false; G.work.search(S); G.rng.chance = () => true; G.work.search(S);
+eq('só uma rodada de currículos por dia', S.job.employed ? 1 : 0, 0);
+G.rng.chance = chance421;
 
 // 43) pausa automática em evento importante
 S = G.newState(43); S.speed = 5; G.alert(S, 'teste');

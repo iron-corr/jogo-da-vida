@@ -30,10 +30,13 @@
   const SETTLE_ORDER = ['poupanca', 'tesouro_selic', 'cdb', 'prefixado', 'ipca', 'fii', 'ibov', 'sp500', 'ouro',
     'utilities', 'bancos', 'commodities', 'varejo', 'tech', 'bitcoin', 'altcoins'];
   const OT_COST = 20, STUDY_COST = 15, SEARCH_COST = 20, BURNOUT_DAYS = 5;
+  // Recolocação: processos seletivos levam no mínimo um mês; depois, uma rodada de currículos por dia,
+  // com um quarto da chance antiga (em média, de algumas semanas a alguns meses a mais).
+  const MIN_JOBLESS = 30;
   const money = v => G.fmt.money(v);
 
   const W = G.work = {
-    CAREER, LIFESTYLE, OT_COST, STUDY_COST, SEARCH_COST,
+    CAREER, LIFESTYLE, OT_COST, STUDY_COST, SEARCH_COST, MIN_JOBLESS,
     // Trilha da carreira: corporativo (padrão), startup (salário menor + participação) ou academia (professor).
     TRACKS: { corporativo: { n: tr('Corporativo', 'Corporate'), sal: 1 }, startup: { n: 'Startup', sal: 0.6 }, academia: { n: tr('Professor universitário', 'University professor'), sal: 0.5 } },
     trackMult: S => W.TRACKS[S.job.track || 'corporativo'].sal,
@@ -100,14 +103,22 @@
       W.spend(S, W.studyCost(S));
       S.knowledge += W.studyGain(S);
     },
+    // Primeiro dia em que uma contratação é possível, contado de quando o emprego acabou.
+    hireFrom: S => (S.job.lostAt || 0) + MIN_JOBLESS,
+    // '' se dá para procurar emprego hoje; senão o motivo ('cedo' ou 'hoje').
+    searchBlock: S => (S.day < W.hireFrom(S) ? 'cedo' : S.job.searchDay === S.day ? 'hoje' : ''),
+    loseJob(S) {
+      Object.assign(S.job, { employed: false, jobless: 0, lostAt: S.day });
+    },
     search(S) {
-      if (S.job.employed || !W.canAct(S, SEARCH_COST)) return;
+      if (S.job.employed || W.searchBlock(S) || !W.canAct(S, SEARCH_COST)) return;
       W.spend(S, SEARCH_COST);
+      S.job.searchDay = S.day;
       let p = Math.min(0.5, 0.1 + 0.005 * S.reputation);
       if (S.macro.regime === 'recessao') p /= 2;
       if (S.research.reserva && W.reserveMonths(S) >= 3) p *= 1.5;
       p += 0.03 * G.social.tierIdx(S);
-      if (G.rng.chance(p)) {
+      if (G.rng.chance(p / 4)) {
         Object.assign(S.job, { employed: true, jobless: 0, retired: false, since: S.day, bonus: 1, track: 'corporativo' });
         G.news(tr(`Contratado de novo como ${CAREER[S.job.level].t}.`, `Hired again as ${CAREER[S.job.level].t}.`), 'good');
       }
@@ -121,9 +132,8 @@
     canRetire: S => !!S.research.fire && S.job.employed && W.passiveIncome(S) >= W.cost(S),
     retire(S) {
       if (!W.canRetire(S)) return;
-      S.job.employed = false;
+      W.loseJob(S);
       S.job.retired = true;
-      S.job.jobless = 0;
       G.legacy.flag(S, 'fire');
       G.news(tr('Você pediu demissão para viver de renda. Seu tempo agora é seu.', 'You quit to live off your income. Your time is now your own.'), 'story');
     },
@@ -173,8 +183,8 @@
       if (!S.research.rotina || !mode || mode === 'off' || S.burnout > 0 || G.life.away(S)) return;
       const floor = W.emax(S) * 0.25;
       for (let turn = 0; turn < 50; turn++) {
-        const jobless = !S.job.employed && !S.job.retired;
-        const study = !jobless && (mode === 'estudar' || (mode === 'misto' && turn % 2 === 0) || S.job.retired || !!S.job.sabbatical);
+        const jobless = !S.job.employed && !S.job.retired && !W.searchBlock(S);
+        const study = !jobless && (!S.job.employed || mode === 'estudar' || (mode === 'misto' && turn % 2 === 0) || S.job.retired || !!S.job.sabbatical);
         const act = jobless ? 'search' : study ? 'study' : 'overtime';
         const cost = study ? W.studyCost(S) : act === 'overtime' ? OT_COST : SEARCH_COST;
         if (S.energy - cost < floor) break;
@@ -244,8 +254,7 @@
       }
 
       if (j.employed && !j.sabbatical && G.rng.chance(G.macro.REGIMES[m.regime].layoff * (j.track === 'academia' ? 0.2 : j.track === 'startup' ? 2 : 1))) {
-        j.employed = false;
-        j.jobless = 0;
+        W.loseJob(S);
         G.alert(S, tr('Você foi demitido. Uma reserva de emergência faria diferença agora.', 'You were laid off. An emergency fund would make a difference now.'), 'bad');
       }
     },

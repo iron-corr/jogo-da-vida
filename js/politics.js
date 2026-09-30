@@ -221,7 +221,7 @@
       if (!o || !PL.canTakeOffice(S, o)) return;
       S.pol.office = { id, until: S.day + o.days };
       if (o.blind && S.job.employed) {
-        S.job.employed = false;
+        G.work.loseJob(S);
         S.job.retired = true;
       }
       if (id === 'bc') S.pol.bcBias = bias === 'dovish' ? -0.03 : bias === 'hawkish' ? 0.03 : 0;
