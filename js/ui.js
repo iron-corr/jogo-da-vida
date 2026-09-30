@@ -1755,7 +1755,7 @@
   function exportFile() {
     G.save();
     const c = G.cal.of(G.S.day);
-    const name = `juros-compostos-${c.year}-${String(c.month).padStart(2, '0')}.txt`;
+    const name = `jogo-da-vida-${c.year}-${String(c.month).padStart(2, '0')}.txt`;
     const url = URL.createObjectURL(new Blob([G.exportSave()], { type: 'text/plain' }));
     const a = document.createElement('a');
     a.href = url;
