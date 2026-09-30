@@ -1342,7 +1342,8 @@
           <tr><td>Lucro da gestora</td><td id="st-fund"></td><td>Retorno de startups</td><td id="st-angel"></td></tr>
           <tr><td>IR pago</td><td id="st-tax"></td><td>Doado</td><td id="st-don"></td></tr></table>
           <p class="muted">Valores nominais somados ao longo da vida. <button class="link" data-act="hints-on">Religar dicas do tutorial</button></p>
-          <p><label class="check"><input type="checkbox" data-act="retro-toggle" id="l-retro"> Mostrar a retrospectiva de cada ano (em janeiro)</label></p></section>
+          <p><label class="check"><input type="checkbox" data-act="retro-toggle" id="l-retro"> Mostrar a retrospectiva de cada ano (em janeiro)</label></p>
+          <p><label class="check"><input type="checkbox" data-act="badges-toggle" id="l-badges"> Marcar com • as abas que têm algo a fazer</label></p></section>
           <section class="card"><h3>Conquistas <small>${Object.keys(L.ach).length}/${LG.ACHIEVEMENTS.length} · +3 pontos cada</small></h3><table class="tbl">`,
           `</table></section><section class="card"><h3>Stats for this life</h3><table class="tbl stats">
           <tr><td>Years lived in the game</td><td id="st-years"></td><td>Peak net worth</td><td id="st-peak"></td></tr>
@@ -1351,7 +1352,8 @@
           <tr><td>Asset manager profit</td><td id="st-fund"></td><td>Startup returns</td><td id="st-angel"></td></tr>
           <tr><td>Income tax paid</td><td id="st-tax"></td><td>Donated</td><td id="st-don"></td></tr></table>
           <p class="muted">Nominal amounts summed over the lifetime. <button class="link" data-act="hints-on">Turn tutorial tips back on</button></p>
-          <p><label class="check"><input type="checkbox" data-act="retro-toggle" id="l-retro"> Show each year's review (in January)</label></p></section>
+          <p><label class="check"><input type="checkbox" data-act="retro-toggle" id="l-retro"> Show each year's review (in January)</label></p>
+          <p><label class="check"><input type="checkbox" data-act="badges-toggle" id="l-badges"> Mark tabs that have something to do with •</label></p></section>
           <section class="card"><h3>Achievements <small>${Object.keys(L.ach).length}/${LG.ACHIEVEMENTS.length} · +3 points each</small></h3><table class="tbl">`);
         for (const a of LG.ACHIEVEMENTS) {
           const got = L.ach[a.id] !== undefined;
@@ -1379,6 +1381,7 @@
         set('l-well', S.life.wellN ? f.num(G.life.avgWell(S), 0) : '—');
         set('l-wellpts', f.num(G.life.wellPoints(S)));
         $('l-retro').checked = S.settings.retro !== false;
+        $('l-badges').checked = S.settings.badges !== false;
         const st = S.stats;
         set('st-years', f.num((S.day - S.birthDay) / 360, 1));
         set('st-peak', f.money(st.peakNW || 0));
@@ -1993,18 +1996,12 @@
   }
 
   // Metas curtas no painel: promoção, FIRE e a próxima conquista da lista.
+  // Próximos passos (ver goals.js): um objetivo por eixo; clicar leva à aba onde ele se resolve.
   function goals(S) {
-    const W = G.work, out = [], nx = W.nextLevel(S);
-    if (nx && S.job.employed) {
-      const k = Math.max(0, nx.k - S.knowledge), r = Math.max(0, nx.rep - S.reputation);
-      const lack = [k && f.num(k, 0) + tr(' conhec.', ' knowl.'), r && f.num(r, 0) + tr(' reput.', ' rep.')].filter(Boolean).join(tr(' e ', ' and '));
-      out.push(W.canPromote(S) ? tr(`Promoção a ${nx.t} disponível!`, `Promotion to ${nx.t} available!`)
-        : tr(`${nx.t}: faltam ${lack}`, `${nx.t}: ${lack} short`));
-    }
-    if (S.research.fire && S.job.employed) out.push(`FIRE: ${f.pct(Math.max(0, G.portfolio.netWorth(S)) / W.fireNumber(S), 0)} ${tr('do número', 'of the number')}`);
-    const a = G.legacy.ACHIEVEMENTS.find(x => S.legacy.ach[x.id] === undefined);
-    if (a) out.push(`${tr('Conquista', 'Achievement')}: ${a.n}, ${a.d.charAt(0).toLowerCase() + a.d.slice(1)}`);
-    return out;
+    return G.goals.list(S).map(g => {
+      const body = `<b>${esc(G.goals.AXES[g.axis])}</b>: ${esc(g.text)}`;
+      return S.tabs[g.tab] ? `<button class="goal link" data-act="tab" data-id="${g.tab}">${body}</button>` : `<div class="goal">${body}</div>`;
+    }).join('');
   }
 
   function renderResources(S) {
@@ -2069,18 +2066,22 @@
     show('row-k', S.tabs.conhecimento);
     show('row-yield', S.tabs.investimentos);
     show('row-infl', S.research.macro1);
-    const g = goals(S).map(x => `<div class="goal">${esc(x)}</div>`).join('');
+    const g = goals(S);
     if (keys.goals !== g) { keys.goals = g; $('r-goals').innerHTML = g; }
   }
 
+  // Abas; um "•" marca as que têm algo a fazer agora (goals.js), com os motivos no tooltip.
   function renderNav(S) {
     const tabs = TABS.filter(([id]) => S.tabs[id]);
     if (!S.tabs[active]) active = 'trabalho';
-    const k = tabs.map(t => t[0]).join() + '|' + active;
+    const badges = S.settings.badges === false ? {} : G.goals.badges(S);
+    const mark = id => (badges[id] && id !== active ? badges[id] : null);
+    const k = tabs.map(t => t[0] + (mark(t[0]) ? '*' + mark(t[0]).join('/') : '')).join() + '|' + active;
     if (keys.nav === k) return;
     keys.nav = k;
     $('tabs').innerHTML = tabs
-      .map(([id, n]) => `<button data-act="tab" data-id="${id}" class="tablink${id === active ? ' active' : ''}">${n}</button>`)
+      .map(([id, n]) => `<button data-act="tab" data-id="${id}" class="tablink${id === active ? ' active' : ''}"${mark(id) ? ` title="${esc(mark(id).join('; '))}"` : ''}>${n}${
+        mark(id) ? '<span class="badge">•</span>' : ''}</button>`)
       .join('<span class="sep">|</span>');
   }
 
@@ -2240,6 +2241,7 @@
           'Take a sabbatical year? You go 12 months without salary, but keep your position.'))) G.work.sabbatical(S);
         break;
       case 'retro-toggle': S.settings.retro = b.checked; break;
+      case 'badges-toggle': S.settings.badges = b.checked; break;
       case 'habit-start': G.social.startHabit(S, id); break;
       case 'habit-drop': G.social.dropHabit(S, id); break;
       case 'social': G.social.doActivity(S, id); break;

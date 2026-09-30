@@ -2,7 +2,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const root = path.join(__dirname, '..');
 const ctx = vm.createContext({ console });
-for (const f of ['i18n', 'rng', 'format', 'calendar', 'data/assets', 'events', 'tax', 'portfolio', 'realty', 'agro', 'angel', 'automation', 'business', 'fund', 'social', 'politics', 'families', 'nation', 'legacy', 'dynasty', 'life', 'choices', 'work', 'macro', 'market', 'state'])
+for (const f of ['i18n', 'rng', 'format', 'calendar', 'data/assets', 'data/research', 'research', 'events', 'tax', 'portfolio', 'realty', 'agro', 'angel', 'automation', 'business', 'fund', 'social', 'politics', 'families', 'nation', 'legacy', 'dynasty', 'goals', 'life', 'choices', 'work', 'macro', 'market', 'state'])
   vm.runInContext(fs.readFileSync(path.join(root, 'js', f + '.js'), 'utf8'), ctx);
 const G = ctx.G;
 let ok = true;
@@ -575,6 +575,29 @@ S = G.newState(66); S.cash = 1e6; S.research.imoveis = true; S.market.prices.imo
 const e66 = S.log[0];
 eq('notícia gravada com a versão em inglês', e66.t2 && /^You bought: downtown studio for R\$ 180,000\./.test(e66.t2) ? 1 : 0, 1);
 eq('versão em português intacta', /^Você comprou: kitnet no centro por R\$ 180\.000\./.test(e66.t) ? 1 : 0, 1);
+
+// 67) próximos passos: um objetivo por eixo, e o caminho até a Presidência passo a passo
+const goal67 = (S, axis) => (G.goals.list(S).find(g => g.axis === axis) || {});
+S = G.newState(67);
+eq('começo: objetivo de carreira aponta a próxima promoção', /^Assistente: faltam/.test(goal67(S, 'carreira').text) ? 1 : 0, 1);
+eq('sem a aba Vida, ainda não há objetivo de poder', goal67(S, 'poder').text ? 1 : 0, 0);
+S.tabs.vida = true;
+eq('primeiro degrau do poder: abrir a aba Poder', goal67(S, 'poder').tab === 'vida' ? 1 : 0, 1);
+eq('família: casar', /^casar/.test(goal67(S, 'familia').text) ? 1 : 0, 1);
+S.social.prestige = 700; S.pol.influence = 500; S.pol.image = 50; S.birthDay = -20 * 360;
+eq('sem cargo público: ocupar um cargo', /^ocupar um cargo público/.test(goal67(S, 'poder').text) ? 1 : 0, 1);
+G.legacy.flag(S, 'cargo');
+eq('com cargo: pesquisar a primeira da cadeia (Etiqueta)', /^pesquisar Etiqueta \(9 pesquisa/.test(goal67(S, 'poder').text) ? 1 : 0, 1);
+for (const id of G.goals.missingChain(S, 'presidencia')) S.research[id] = true;
+S.day = 360; // 2027: fora da janela
+eq('com tudo, fora da janela: mostra a próxima eleição', /2030$/.test(goal67(S, 'poder').text) ? 1 : 0, 1);
+S.day = 4 * 360 + 60; // março de 2030
+eq('na janela: lançar a candidatura', /^lançar a candidatura/.test(goal67(S, 'poder').text) ? 1 : 0, 1);
+S.tabs.poder = true;
+eq('aviso na aba Poder com a candidatura aberta', (G.goals.badges(S).poder || []).length > 0 ? 1 : 0, 1);
+S.knowledge = 1e4; S.reputation = 1e3; S.tabs.conhecimento = true;
+eq('aviso na aba Trabalho quando dá para promover', (G.goals.badges(S).trabalho || []).length, 1);
+eq('patrimônio: próximo marco em reais de 2026', /^R\$ 1,00 mi em reais de 2026/.test(goal67(S, 'patrimonio').text) ? 1 : 0, 1);
 
 console.log(ok ? '\nTODOS OK' : '\nHÁ FALHAS');
 process.exitCode = ok ? 0 : 1;
