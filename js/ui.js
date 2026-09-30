@@ -1,26 +1,28 @@
 (function () {
   const G = globalThis.G;
+  const tr = G.L;
   const f = G.fmt;
   const $ = id => document.getElementById(id);
 
   const TABS = [
-    ['trabalho', 'Trabalho'],
-    ['investimentos', 'Investimentos'],
-    ['conhecimento', 'Conhecimento'],
-    ['mercado', 'Mercado'],
-    ['vida', 'Vida'],
-    ['lazer', 'Lazer'],
-    ['poder', 'Poder'],
-    ['negocios', 'Negócios'],
-    ['imoveis', 'Imóveis'],
-    ['terras', 'Terras'],
+    ['trabalho', tr('Trabalho', 'Work')],
+    ['investimentos', tr('Investimentos', 'Investments')],
+    ['conhecimento', tr('Conhecimento', 'Knowledge')],
+    ['mercado', tr('Mercado', 'Market')],
+    ['vida', tr('Vida', 'Life')],
+    ['lazer', tr('Lazer', 'Leisure')],
+    ['poder', tr('Poder', 'Power')],
+    ['negocios', tr('Negócios', 'Business')],
+    ['imoveis', tr('Imóveis', 'Real estate')],
+    ['terras', tr('Terras', 'Land')],
     ['startups', 'Startups'],
-    ['legado', 'Legado'],
+    ['legado', tr('Legado', 'Legacy')],
   ];
 
   const FRACS = [0.1, 0.25, 0.5];
   let active = 'trabalho';
-  let invFilter = 'Todos';
+  const ALL = tr('Todos', 'All');
+  let invFilter = ALL;
   let keys = {};
   let colors = {};
 
@@ -38,9 +40,9 @@
     if (el && (el.title || '') !== (reason || '')) el.title = reason || '';
   };
   const need = (S, { cash = 0, energy = 0 } = {}) => {
-    if (energy && S.burnout > 0) return `em burnout por mais ${S.burnout} dia(s)`;
-    if (energy && S.energy < energy) return `falta energia: ${Math.floor(S.energy)}/${energy}`;
-    if (cash && S.cash < cash) return `faltam ${f.money(cash - S.cash)}`;
+    if (energy && S.burnout > 0) return tr(`em burnout por mais ${S.burnout} dia(s)`, `burned out for ${S.burnout} more day(s)`);
+    if (energy && S.energy < energy) return tr(`falta energia: ${Math.floor(S.energy)}/${energy}`, `not enough energy: ${Math.floor(S.energy)}/${energy}`);
+    if (cash && S.cash < cash) return tr(`faltam ${f.money(cash - S.cash)}`, `${f.money(cash - S.cash)} short`);
     return '';
   };
   const show = (id, on) => {
@@ -49,10 +51,11 @@
   };
   const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
 
-  // Aceita "1.500,50", "1500.5", "R$ 2 mil" não (só números).
+  // Aceita "1.500,50", "1500.5", "R$ 2 mil" não (só números). Em inglês, "1,500.50".
   function parseMoney(s) {
     s = String(s).replace(/[^\d,.]/g, '');
-    if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+    if (G.EN) s = s.replace(/,/g, '');
+    else if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
     return parseFloat(s) || 0;
   }
 
@@ -108,19 +111,20 @@
   // Seção de automação: alocação-alvo, aporte automático, rebalanceamento e robô.
   function autoSection(S, ids) {
     const A = S.auto;
-    let h = `<section class="card"><h3>Estratégia automática</h3>
-      <p><label class="check"><input type="checkbox" data-act="auto-on" id="au-on"> Aporte automático: todo mês, investir o que passar de
-      <input class="num" data-set="reserve" value="${A.reserve}" inputmode="numeric"> meses de gastos em caixa</label></p>`;
+    let h = `<section class="card"><h3>${tr('Estratégia automática', 'Automatic strategy')}</h3>
+      <p><label class="check"><input type="checkbox" data-act="auto-on" id="au-on"> ${tr('Aporte automático: todo mês, investir o que passar de', 'Automatic investing: every month, invest anything above')}
+      <input class="num" data-set="reserve" value="${A.reserve}" inputmode="numeric"> ${tr('meses de gastos em caixa', 'months of expenses in cash')}</label></p>`;
     if (S.research.rebalanceamento) {
-      h += `<p><label class="check"><input type="checkbox" data-act="auto-rebal" id="au-rebal"> Rebalancear ${S.research.quant ? 'todo mês' : 'a cada trimestre'}
-        quando um ativo sair mais de ${f.pct(A.band, 0)} do alvo</label></p>`;
+      h += `<p><label class="check"><input type="checkbox" data-act="auto-rebal" id="au-rebal"> ${tr(`Rebalancear ${S.research.quant ? 'todo mês' : 'a cada trimestre'}
+        quando um ativo sair mais de ${f.pct(A.band, 0)} do alvo`, `Rebalance ${S.research.quant ? 'every month' : 'every quarter'}
+        when an asset drifts more than ${f.pct(A.band, 0)} from target`)}</label></p>`;
     }
     if (S.research.quant) {
-      h += `<p>Robô: <select data-set="robot">${Object.entries(G.auto.ROBOTS).map(([k, r]) =>
+      h += `<p>${tr('Robô', 'Bot')}: <select data-set="robot">${Object.entries(G.auto.ROBOTS).map(([k, r]) =>
         `<option value="${k}"${k === A.robot ? ' selected' : ''}>${r.n}</option>`).join('')}</select>
         <span class="muted" id="au-robot-d"></span></p>`;
     }
-    h += '<table class="tbl alloc"><tr><td><b>Ativo</b></td><td><b>Alvo</b></td><td><b>Efetivo</b></td><td><b>Atual</b></td></tr>';
+    h += `<table class="tbl alloc"><tr><td><b>${tr('Ativo', 'Asset')}</b></td><td><b>${tr('Alvo', 'Target')}</b></td><td><b>${tr('Efetivo', 'Effective')}</b></td><td><b>${tr('Atual', 'Current')}</b></td></tr>`;
     for (const id of ids) {
       h += `<tr><td>${G.ASSETS[id].n}</td><td><input class="num" data-alloc="${id}" value="${A.targets[id] || ''}" inputmode="numeric" placeholder="0"> %</td>
         <td id="au-e-${id}"></td><td id="au-c-${id}"></td></tr>`;
@@ -143,38 +147,53 @@
       set(`au-e-${id}`, t[id] ? f.pct(t[id], 0) : '');
       set(`au-c-${id}`, total > 0 && P.value(S, id) > 0 ? f.pct(P.value(S, id) / total, 0) : '');
     }
-    set('au-sum', sum ? `Os alvos somam ${sum}%; são normalizados para 100%. "Efetivo" já inclui a inclinação do robô.`
-      : 'Preencha os alvos (em %) para ligar a estratégia.');
+    set('au-sum', sum ? tr(`Os alvos somam ${sum}%; são normalizados para 100%. "Efetivo" já inclui a inclinação do robô.`,
+      `Targets add up to ${sum}%; they are normalized to 100%. "Effective" already includes the bot's tilt.`)
+      : tr('Preencha os alvos (em %) para ligar a estratégia.', 'Fill in the targets (in %) to turn the strategy on.'));
   }
 
 
   // Explicações do painel lateral (aparecem ao passar o mouse).
   const TIPS = {
-    cash: 'Dinheiro parado na conta. Perde para a inflação; o que passar da reserva pode ir para investimentos.',
-    nw: 'Tudo o que você tem: caixa, investimentos, imóveis (menos dívidas), startups, empresas e gestora.',
-    reserve: 'Quantos meses de gastos o caixa, a poupança e o Tesouro Selic cobrem. Protege contra demissão.',
-    en: 'Gasta em estudar, hora extra, hábitos e empresas sem gerente. Volta todo dia. Abaixo de 25% há risco de burnout.',
-    age: 'Aos 60 dá para passar o bastão ao herdeiro. A expectativa de vida é oculta; o stress a reduz, exercício a aumenta.',
-    k: 'Moeda das pesquisas e das promoções. Vem de estudar, ler e investir.',
-    rep: 'Cresce com os meses de trabalho. Exigida nas promoções; ajuda a achar emprego e captar na gestora.',
-    status: 'Posição social: prestígio + metade da visibilidade. Abre clubes, cargos, palestras e o fim de jogo.',
-    stress: 'Sobe com quedas do patrimônio, dívidas e desemprego. Acima de 70 quebra hábitos e aumenta o burnout.',
-    well: 'Bem-estar (0 a 100): família, saúde, hobbies, férias, cidade e pouco stress. A média da vida vira pontos de legado.',
-    inf: 'Capital político. Vem de doações a quem vence, mídia, entidades e cargos. Paga o lobby. Cai 2% ao mês.',
-    img: 'Imagem pública (−100 a +100). Filantropia sobe; ostentação, lobby exposto e escândalos derrubam.',
-    sal: 'Salário do cargo atual, reajustado pela inflação todo janeiro.',
-    yield: 'Juros, dividendos e aluguéis de FIIs esperados por mês (sem contar a variação de preço).',
-    rent: 'Aluguel líquido dos imóveis ocupados.',
-    agro: 'Arrendamentos e gado por mês. As safras de soja e café entram de uma vez na colheita.',
-    loan: 'Parcelas dos financiamentos de imóveis (taxa fixa) e de empresas (acompanham a Selic).',
-    biz: 'Lucro das empresas, já descontando gerentes e imposto.',
-    fund: 'Lucro da gestora no último mês.',
-    social: 'Renda do cônjuge menos clubes e escola.',
-    pol: 'Mídia e think tank, menos o que o cargo público paga.',
-    cost: 'Custo de vida do mês: moradia, família e hábitos. Sobe com a inflação.',
-    net: 'Quanto sobra (ou falta) por mês com tudo somado.',
-    selic: 'Taxa básica de juros, decidida pelo Copom a cada 45 dias.',
-    infl: 'Inflação anual corrente.',
+    cash: tr('Dinheiro parado na conta. Perde para a inflação; o que passar da reserva pode ir para investimentos.',
+      'Money sitting in your account. It loses to inflation; anything above your reserve can go into investments.'),
+    nw: tr('Tudo o que você tem: caixa, investimentos, imóveis (menos dívidas), startups, empresas e gestora.',
+      'Everything you own: cash, investments, real estate (minus debt), startups, businesses and asset manager.'),
+    reserve: tr('Quantos meses de gastos o caixa, a poupança e o Tesouro Selic cobrem. Protege contra demissão.',
+      'How many months of expenses your cash, savings and Selic Treasury cover. Protects against a layoff.'),
+    en: tr('Gasta em estudar, hora extra, hábitos e empresas sem gerente. Volta todo dia. Abaixo de 25% há risco de burnout.',
+      'Spent on studying, overtime, habits and businesses without a manager. Refills every day. Below 25% there is a burnout risk.'),
+    age: tr('Aos 60 dá para passar o bastão ao herdeiro. A expectativa de vida é oculta; o stress a reduz, exercício a aumenta.',
+      'At 60 you can pass the torch to your heir. Life expectancy is hidden; stress lowers it, exercise raises it.'),
+    k: tr('Moeda das pesquisas e das promoções. Vem de estudar, ler e investir.', 'The currency of research and promotions. Comes from studying, reading and investing.'),
+    rep: tr('Cresce com os meses de trabalho. Exigida nas promoções; ajuda a achar emprego e captar na gestora.',
+      'Grows with months of work. Required for promotions; helps you find a job and raise money for the asset manager.'),
+    status: tr('Posição social: prestígio + metade da visibilidade. Abre clubes, cargos, palestras e o fim de jogo.',
+      'Social status: prestige + half of visibility. Opens clubs, offices, talks and the endgame.'),
+    stress: tr('Sobe com quedas do patrimônio, dívidas e desemprego. Acima de 70 quebra hábitos e aumenta o burnout.',
+      'Rises with net worth drops, debt and unemployment. Above 70 it breaks habits and increases burnout.'),
+    well: tr('Bem-estar (0 a 100): família, saúde, hobbies, férias, cidade e pouco stress. A média da vida vira pontos de legado.',
+      'Well-being (0 to 100): family, health, hobbies, vacations, city and low stress. The lifetime average turns into legacy points.'),
+    inf: tr('Capital político. Vem de doações a quem vence, mídia, entidades e cargos. Paga o lobby. Cai 2% ao mês.',
+      'Political capital. Comes from donations to winners, media, associations and offices. Pays for lobbying. Falls 2% per month.'),
+    img: tr('Imagem pública (−100 a +100). Filantropia sobe; ostentação, lobby exposto e escândalos derrubam.',
+      'Public image (−100 to +100). Philanthropy raises it; showing off, exposed lobbying and scandals sink it.'),
+    sal: tr('Salário do cargo atual, reajustado pela inflação todo janeiro.', 'Salary of your current position, adjusted for inflation every January.'),
+    yield: tr('Juros, dividendos e aluguéis de FIIs esperados por mês (sem contar a variação de preço).',
+      'Interest, dividends and REIT rents expected per month (not counting price changes).'),
+    rent: tr('Aluguel líquido dos imóveis ocupados.', 'Net rent from occupied properties.'),
+    agro: tr('Arrendamentos e gado por mês. As safras de soja e café entram de uma vez na colheita.',
+      'Land leases and cattle per month. Soy and coffee crops come in all at once at harvest.'),
+    loan: tr('Parcelas dos financiamentos de imóveis (taxa fixa) e de empresas (acompanham a Selic).',
+      'Payments on property mortgages (fixed rate) and business loans (follow the Selic).'),
+    biz: tr('Lucro das empresas, já descontando gerentes e imposto.', 'Business profit, net of managers and taxes.'),
+    fund: tr('Lucro da gestora no último mês.', 'Asset manager profit last month.'),
+    social: tr('Renda do cônjuge menos clubes e escola.', 'Spouse income minus clubs and school.'),
+    pol: tr('Mídia e think tank, menos o que o cargo público paga.', 'Media and think tank, minus what public office pays.'),
+    cost: tr('Custo de vida do mês: moradia, família e hábitos. Sobe com a inflação.', 'Monthly cost of living: housing, family and habits. Rises with inflation.'),
+    net: tr('Quanto sobra (ou falta) por mês com tudo somado.', 'How much is left over (or missing) each month, all told.'),
+    selic: tr('Taxa básica de juros, decidida pelo Copom a cada 45 dias.', 'Brazil\'s base interest rate, set by the Copom every 45 days.'),
+    infl: tr('Inflação anual corrente.', 'Current annual inflation.'),
   };
 
   // Histórico mensal do patrimônio + o valor de agora, para o gráfico terminar no número exibido.
@@ -187,9 +206,9 @@
       const id = key.slice(6), a = G.ASSETS[id];
       return { title: a.n, data: S.market.hist[id].map(v => v * (a.unit || 1)), step: 1, money: true };
     }
-    if (key === 'selic') return { title: 'Selic', data: S.macro.selicHist, step: 45, pct: true };
-    if (key === 'pmi') return { title: 'PMI da indústria', data: S.macro.pmiHist, step: 30 };
-    if (key === 'nw') return { title: 'Seu patrimônio', data: nwSeries(S), step: 30, money: true };
+    if (key === 'selic') return { title: 'Selic', data: S.macro.selicHist, step: 45, pct: true, neutral: true };
+    if (key === 'pmi') return { title: tr('PMI da indústria', 'Manufacturing PMI'), data: S.macro.pmiHist, step: 30, neutral: true };
+    if (key === 'nw') return { title: tr('Seu patrimônio', 'Your net worth'), data: nwSeries(S), step: 30, money: true };
     return null;
   }
   function bigChart(cv, s) {
@@ -212,10 +231,10 @@
     ctx.globalAlpha = 1;
     for (const v of [lo, (lo + hi) / 2, hi]) ctx.fillText(fmtV(v), 2, y(v) + 4);
     const days = (data.length - 1) * s.step;
-    ctx.fillText(days >= 360 ? `há ${f.num(days / 360, 1)} anos` : `há ${days} dias`, L, h - 6);
-    const hoje = 'hoje';
+    ctx.fillText(days >= 360 ? tr(`há ${f.num(days / 360, 1)} anos`, `${f.num(days / 360, 1)} years ago`) : tr(`há ${days} dias`, `${days} days ago`), L, h - 6);
+    const hoje = tr('hoje', 'today');
     ctx.fillText(hoje, w - R - ctx.measureText(hoje).width, h - 6);
-    ctx.strokeStyle = s.pct || s.title.startsWith('PMI') ? colors.accent : data[data.length - 1] >= data[0] ? colors.up : colors.down;
+    ctx.strokeStyle = s.neutral ? colors.accent : data[data.length - 1] >= data[0] ? colors.up : colors.down;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     data.forEach((v, i) => (i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v))));
@@ -257,35 +276,41 @@
     set('modal-title', s.title);
     const d = s.data, last = d[d.length - 1];
     const ret = n => (d.length > n ? f.signedPct(last / d[d.length - 1 - n] - 1, 1) : '—');
-    const per = s.step === 1 ? [['1 mês', 30], ['6 meses', 180], ['1 ano', 360], ['2 anos', 719]]
-      : s.step === 30 ? [['1 ano', 12], ['5 anos', 60], ['20 anos', 239]] : [];
-    set('modal-info', `Agora: ${s.money ? f.money(last) : s.pct ? f.pct(last) : f.num(last, 1)}` +
-      (s.pct || s.title.startsWith('PMI') ? '' : per.map(([n, k]) => ` · ${n}: ${ret(k)}`).join('')));
+    const per = s.step === 1 ? [[tr('1 mês', '1 month'), 30], [tr('6 meses', '6 months'), 180], [tr('1 ano', '1 year'), 360], [tr('2 anos', '2 years'), 719]]
+      : s.step === 30 ? [[tr('1 ano', '1 year'), 12], [tr('5 anos', '5 years'), 60], [tr('20 anos', '20 years'), 239]] : [];
+    set('modal-info', `${tr('Agora', 'Now')}: ${s.money ? f.money(last) : s.pct ? f.pct(last) : f.num(last, 1)}` +
+      (s.neutral ? '' : per.map(([n, k]) => ` · ${n}: ${ret(k)}`).join('')));
     bigChart($('modal-c'), s);
   }
 
   // Dicas de tutorial: a primeira que se aplica aparece acima das abas; dá para dispensar ou desligar.
   const HINTS = [
     { id: 'estudar', when: S => S.knowledge < 3 && !Object.keys(S.research).length,
-      t: 'Comece clicando em <b>Estudar</b> para ganhar conhecimento, ou em <b>Hora extra</b> para ganhar dinheiro. A energia volta todo dia.' },
+      t: tr('Comece clicando em <b>Estudar</b> para ganhar conhecimento, ou em <b>Hora extra</b> para ganhar dinheiro. A energia volta todo dia.',
+        'Start by clicking <b>Study</b> to gain knowledge, or <b>Overtime</b> to earn money. Energy refills every day.') },
     { id: 'poupanca', when: S => S.tabs.investimentos && G.portfolio.invested(S) === 0,
-      t: 'Dinheiro parado perde para a inflação. Na aba <b>Investimentos</b>, aplique na poupança o que sobrar.' },
+      t: tr('Dinheiro parado perde para a inflação. Na aba <b>Investimentos</b>, aplique na poupança o que sobrar.',
+        'Idle money loses to inflation. In the <b>Investments</b> tab, put what\'s left over into savings.') },
     { id: 'rotina', when: S => S.tabs.conhecimento && !S.research.rotina,
-      t: 'Pesquise <b>Rotina</b> (aba Conhecimento) para ligar o piloto automático e parar de clicar.' },
+      t: tr('Pesquise <b>Rotina</b> (aba Conhecimento) para ligar o piloto automático e parar de clicar.',
+        'Research <b>Routine</b> (Knowledge tab) to turn on autopilot and stop clicking.') },
     { id: 'piloto', when: S => S.research.rotina && S.routine === 'off',
-      t: 'Ligue o <b>piloto automático</b> em Trabalho → Dia a dia.' },
+      t: tr('Ligue o <b>piloto automático</b> em Trabalho → Dia a dia.', 'Turn on <b>autopilot</b> in Work → Day to day.') },
     { id: 'edu_fin', when: S => S.tabs.conhecimento && !S.research.edu_fin && S.knowledge >= 5,
-      t: 'Pesquise <b>Educação financeira</b>: o Tesouro Selic rende bem mais que a poupança.' },
+      t: tr('Pesquise <b>Educação financeira</b>: o Tesouro Selic rende bem mais que a poupança.',
+        'Research <b>Financial literacy</b>: the Selic Treasury pays much more than savings.') },
     { id: 'promocao', when: S => G.work.canPromote(S),
-      t: 'Você já pode <b>pedir promoção</b> na aba Trabalho.' },
+      t: tr('Você já pode <b>pedir promoção</b> na aba Trabalho.', 'You can now <b>ask for a promotion</b> in the Work tab.') },
     { id: 'alvos', when: S => S.research.aporte_auto && !Object.values(S.auto.targets).some(v => v > 0),
-      t: 'Defina seus alvos em <b>Investimentos → Estratégia automática</b> e ligue o aporte automático.' },
+      t: tr('Defina seus alvos em <b>Investimentos → Estratégia automática</b> e ligue o aporte automático.',
+        'Set your targets in <b>Investments → Automatic strategy</b> and turn on automatic investing.') },
     { id: 'habito', when: S => S.tabs.vida && !Object.keys(S.social.habits).length,
-      t: 'Na aba <b>Vida</b>, comece um hábito. Exercício e leitura se pagam rápido.' },
+      t: tr('Na aba <b>Vida</b>, comece um hábito. Exercício e leitura se pagam rápido.', 'In the <b>Life</b> tab, start a habit. Exercise and reading pay off fast.') },
     { id: 'panico', when: S => S.social.pending && S.social.pending.type === 'panic',
-      t: 'Pânico na bolsa: veja a aba <b>Vida</b>. Quem vende no fundo costuma se arrepender.' },
+      t: tr('Pânico na bolsa: veja a aba <b>Vida</b>. Quem vende no fundo costuma se arrepender.',
+        'Market panic: check the <b>Life</b> tab. Those who sell at the bottom usually regret it.') },
     { id: 'herdeiro', when: S => G.legacy.age(S) >= 50 && !S.social.family.kids,
-      t: 'Sem filhos, metade do seu legado se perde. A família fica na aba <b>Vida</b>.' },
+      t: tr('Sem filhos, metade do seu legado se perde. A família fica na aba <b>Vida</b>.', 'Without children, half your legacy is lost. Family is in the <b>Life</b> tab.') },
   ];
   let hintKey = null;
   function renderHint(S) {
@@ -296,8 +321,8 @@
     hintKey = k;
     const box = $('hint');
     box.hidden = !h;
-    if (h) box.innerHTML = `<span>${h.t}</span> <button class="link" data-act="hint-ok" data-id="${h.id}">entendi</button>
-      <button class="link" data-act="hint-all">desligar dicas</button>`;
+    if (h) box.innerHTML = `<span>${h.t}</span> <button class="link" data-act="hint-ok" data-id="${h.id}">${tr('entendi', 'got it')}</button>
+      <button class="link" data-act="hint-all">${tr('desligar dicas', 'turn off tips')}</button>`;
   }
 
   // Decisão pendente (pânico, tentação ou carta de escolha): aparece acima de qualquer aba.
@@ -312,17 +337,21 @@
       if (!p) return;
       let h;
       if (p.type === 'panic') {
-        h = `<h3>Pânico no mercado</h3><p>A bolsa despencou e você não dorme direito. Vender todas as ações e criptos agora?</p>
+        h = tr(`<h3>Pânico no mercado</h3><p>A bolsa despencou e você não dorme direito. Vender todas as ações e criptos agora?</p>
           <p class="muted">Se você não decidir em <span id="d-left"></span> dias, o impulso passa e você segura.</p>
-          <button data-act="decide" data-id="1">Vender tudo</button> <button data-act="decide" data-id="0">Segurar firme</button>`;
+          <button data-act="decide" data-id="1">Vender tudo</button> <button data-act="decide" data-id="0">Segurar firme</button>`,
+          `<h3>Market panic</h3><p>The market crashed and you can't sleep. Sell all your stocks and crypto now?</p>
+          <p class="muted">If you don't decide within <span id="d-left"></span> days, the urge passes and you hold.</p>
+          <button data-act="decide" data-id="1">Sell everything</button> <button data-act="decide" data-id="0">Hold firm</button>`);
       } else if (p.type === 'tempt') {
-        h = `<h3>Tentação</h3><p>${esc(SO.HABITS[p.id].offer)}</p>
-          <p class="muted">${esc(SO.HABITS[p.id].d)} Ocupa uma vaga de hábito. A oferta some em <span id="d-left"></span> dias.</p>
-          <button data-act="decide" data-id="1" id="b-tempt">Aceitar</button> <button data-act="decide" data-id="0">Recusar</button>`;
+        h = `<h3>${tr('Tentação', 'Temptation')}</h3><p>${esc(SO.HABITS[p.id].offer)}</p>
+          <p class="muted">${esc(SO.HABITS[p.id].d)} ${tr('Ocupa uma vaga de hábito. A oferta some em <span id="d-left"></span> dias.',
+            'Takes up a habit slot. The offer disappears in <span id="d-left"></span> days.')}</p>
+          <button data-act="decide" data-id="1" id="b-tempt">${tr('Aceitar', 'Accept')}</button> <button data-act="decide" data-id="0">${tr('Recusar', 'Decline')}</button>`;
       } else {
         const c = G.choices.byId(p.id);
         h = `<h3>${esc(c.title)}</h3><p>${esc(c.text(S, p.data))}</p>
-          <p class="muted">Sem resposta em <span id="d-left"></span> dias, fica valendo "${esc(c.options[c.def].label)}".</p>
+          <p class="muted">${tr('Sem resposta em <span id="d-left"></span> dias, fica valendo', 'With no answer within <span id="d-left"></span> days, the default is')} "${esc(c.options[c.def].label)}".</p>
           ${c.options.map((o, i) => `<button data-act="decide" data-id="${i}">${esc(o.label)}${o.hint ? ` <small>${esc(o.hint)}</small>` : ''}</button>`).join(' ')}`;
       }
       box.innerHTML = `<section class="card alert">${h}</section>`;
@@ -341,55 +370,65 @@
       build(S) {
         const W = G.work, cur = W.CAREER[S.job.level], nx = W.nextLevel(S);
         const neg = W.salaryMult(S), bonusE = W.emax(S) - W.LIFESTYLE[S.lifestyle].emax;
-        let h = `<section class="card"><h3>Carreira</h3>
-          <p><b>${cur.t}</b>${S.job.track && S.job.track !== 'corporativo' ? ` <small>(${W.TRACKS[S.job.track].n})</small>` : ''} · <span id="w-sal"></span>/mês
-          ${S.job.employed ? '' : '<span class="bad">(desempregado)</span>'}${S.job.sabbatical ? ' <span class="good">em ano sabático</span>' : ''}</p>`;
+        let h = `<section class="card"><h3>${tr('Carreira', 'Career')}</h3>
+          <p><b>${cur.t}</b>${S.job.track && S.job.track !== 'corporativo' ? ` <small>(${W.TRACKS[S.job.track].n})</small>` : ''} · <span id="w-sal"></span>/${tr('mês', 'month')}
+          ${S.job.employed ? '' : `<span class="bad">(${tr('desempregado', 'unemployed')})</span>`}${S.job.sabbatical ? ` <span class="good">${tr('em ano sabático', 'on sabbatical')}</span>` : ''}</p>`;
         if (nx) {
-          h += `<p class="muted">Próximo cargo: <b>${nx.t}</b> (${f.money(nx.sal * S.job.wageIndex * neg)}/mês).
+          h += tr(`<p class="muted">Próximo cargo: <b>${nx.t}</b> (${f.money(nx.sal * S.job.wageIndex * neg)}/mês).
             Requer ${nx.k} de conhecimento (gasto na promoção) e ${nx.rep} de reputação.</p>
-            <button data-act="promote" id="b-promote">Pedir promoção</button>`;
-        } else h += '<p class="muted">Você chegou ao topo da carreira.</p>';
+            <button data-act="promote" id="b-promote">Pedir promoção</button>`,
+            `<p class="muted">Next position: <b>${nx.t}</b> (${f.money(nx.sal * S.job.wageIndex * neg)}/month).
+            Requires ${nx.k} knowledge (spent on the promotion) and ${nx.rep} reputation.</p>
+            <button data-act="promote" id="b-promote">Ask for a promotion</button>`);
+        } else h += `<p class="muted">${tr('Você chegou ao topo da carreira.', 'You have reached the top of your career.')}</p>`;
         if (S.job.employed && !S.job.sabbatical) {
-          h += ` <button data-act="sabbatical" id="b-sabb">Ano sabático <small>12 meses sem salário, stress zerado, +30 conhecimento</small></button>`;
+          h += ` <button data-act="sabbatical" id="b-sabb">${tr('Ano sabático <small>12 meses sem salário, stress zerado, +30 conhecimento</small>',
+            'Sabbatical year <small>12 months without salary, stress reset, +30 knowledge</small>')}</button>`;
         }
-        h += '</section><section class="card"><h3>Dia a dia</h3><div class="btns">';
+        h += `</section><section class="card"><h3>${tr('Dia a dia', 'Day to day')}</h3><div class="btns">`;
         h += S.job.employed
-          ? `<button data-act="overtime" id="b-ot">Hora extra <small>[H] −${W.OT_COST} energia, <span id="w-ot"></span></small></button>`
-          : `<button data-act="search" id="b-search">${S.job.retired ? 'Voltar a trabalhar' : 'Procurar emprego'} <small>−${W.SEARCH_COST} energia</small></button>`;
-        h += `<button data-act="study" id="b-study">Estudar <small>[E] −${W.studyCost(S)} energia, <span id="w-st"></span></small></button>
+          ? `<button data-act="overtime" id="b-ot">${tr('Hora extra', 'Overtime')} <small>[H] −${W.OT_COST} ${tr('energia', 'energy')}, <span id="w-ot"></span></small></button>`
+          : `<button data-act="search" id="b-search">${S.job.retired ? tr('Voltar a trabalhar', 'Go back to work') : tr('Procurar emprego', 'Look for a job')} <small>−${W.SEARCH_COST} ${tr('energia', 'energy')}</small></button>`;
+        h += `<button data-act="study" id="b-study">${tr('Estudar', 'Study')} <small>[E] −${W.studyCost(S)} ${tr('energia', 'energy')}, <span id="w-st"></span></small></button>
           </div>`;
         if (S.research.rotina) {
-          h += `<p>Piloto automático: <select data-set="routine">${Object.entries(W.ROUTINES).map(([k, n]) =>
+          h += `<p>${tr('Piloto automático', 'Autopilot')}: <select data-set="routine">${Object.entries(W.ROUTINES).map(([k, n]) =>
             `<option value="${k}"${k === S.routine ? ' selected' : ''}>${n}</option>`).join('')}</select>
             <span class="muted" id="w-auto"></span></p>`;
         }
         h += '<p id="w-burn" class="bad" hidden></p></section>';
         if (S.research.fire) {
-          h += `<section class="card"><h3>Independência financeira</h3>
+          h += tr(`<section class="card"><h3>Independência financeira</h3>
             <p>Número FIRE (25× o custo anual): <b id="w-fire"></b> · você tem <b id="w-fire-pct"></b></p>
             <p>Renda passiva: <b id="w-passive"></b>/mês contra custo de vida de <b id="w-cost"></b>/mês</p>
-            ${S.job.employed ? '<button data-act="retire" id="b-retire">Pedir demissão e viver de renda</button>' : ''}</section>`;
+            ${S.job.employed ? '<button data-act="retire" id="b-retire">Pedir demissão e viver de renda</button>' : ''}</section>`,
+            `<section class="card"><h3>Financial independence</h3>
+            <p>FIRE number (25× annual cost): <b id="w-fire"></b> · you have <b id="w-fire-pct"></b></p>
+            <p>Passive income: <b id="w-passive"></b>/month against a cost of living of <b id="w-cost"></b>/month</p>
+            ${S.job.employed ? '<button data-act="retire" id="b-retire">Quit and live off your income</button>' : ''}</section>`);
         }
         if (S.tabs.estilo) {
-          h += `<section class="card"><h3>Estilo de vida</h3>
-            <p class="muted">Morar melhor dá mais energia, mas custa todo mês. Subir de padrão custa 2 meses do novo custo (mudança, móveis).</p>
+          h += `<section class="card"><h3>${tr('Estilo de vida', 'Lifestyle')}</h3>
+            <p class="muted">${tr('Morar melhor dá mais energia, mas custa todo mês. Subir de padrão custa 2 meses do novo custo (mudança, móveis).',
+              'Living better gives more energy, but costs every month. Moving up costs 2 months of the new cost (moving, furniture).')}</p>
             <table class="tbl">`;
           W.LIFESTYLE.forEach((l, i) => {
             const cur = i === S.lifestyle;
-            h += `<tr class="${cur ? 'cur' : ''}"><td>${l.n}</td><td id="ls-c-${i}"></td><td>energia ${l.emax + bonusE}, +${l.regen}/dia</td>
-              <td>${cur ? '<b>atual</b>' : `<button data-act="lifestyle" data-i="${i}" id="b-ls-${i}">${i > S.lifestyle ? 'Mudar' : 'Reduzir'}</button>`}</td></tr>`;
+            h += `<tr class="${cur ? 'cur' : ''}"><td>${l.n}</td><td id="ls-c-${i}"></td><td>${tr('energia', 'energy')} ${l.emax + bonusE}, +${l.regen}/${tr('dia', 'day')}</td>
+              <td>${cur ? `<b>${tr('atual', 'current')}</b>` : `<button data-act="lifestyle" data-i="${i}" id="b-ls-${i}">${i > S.lifestyle ? tr('Mudar', 'Move') : tr('Reduzir', 'Downsize')}</button>`}</td></tr>`;
           });
           h += '</table>';
           // Cidade e casa própria
           const LF = G.life, home = LF.home(S);
-          h += `<h3 style="margin-top:10px">Cidade</h3><table class="tbl">`;
+          h += `<h3 style="margin-top:10px">${tr('Cidade', 'City')}</h3><table class="tbl">`;
           for (const [id, c] of Object.entries(LF.CITIES)) {
             h += `<tr class="${id === S.life.city ? 'cur' : ''}"><td>${c.n}<br><small class="muted">${c.d}</small></td>
-              <td>${id === S.life.city ? '<b>atual</b>' : `<button data-act="city" data-id="${id}" id="b-city-${id}">Mudar <small id="w-cc-${id}"></small></button>`}</td></tr>`;
+              <td>${id === S.life.city ? `<b>${tr('atual', 'current')}</b>` : `<button data-act="city" data-id="${id}" id="b-city-${id}">${tr('Mudar', 'Move')} <small id="w-cc-${id}"></small></button>`}</td></tr>`;
           }
-          h += `</table><p>${home ? `Você mora no seu imóvel (${G.realty.prop(home.pid).n.toLowerCase()}): <span id="w-home"></span>
-            <button class="link" data-act="home-out">voltar a alugar</button>`
-            : '<span class="muted">Você mora de aluguel. Com um imóvel seu vago (aba Imóveis), dá para morar nele e cortar 40% do custo de vida.</span>'}</p></section>`;
+          h += `</table><p>${home ? `${tr('Você mora no seu imóvel', 'You live in your own property')} (${G.realty.prop(home.pid).n.toLowerCase()}): <span id="w-home"></span>
+            <button class="link" data-act="home-out">${tr('voltar a alugar', 'go back to renting')}</button>`
+            : `<span class="muted">${tr('Você mora de aluguel. Com um imóvel seu vago (aba Imóveis), dá para morar nele e cortar 40% do custo de vida.',
+              'You rent. With a vacant property of your own (Real estate tab), you can live in it and cut 40% of your cost of living.')}</span>`}</p></section>`;
         }
         return h;
       },
@@ -397,7 +436,9 @@
         const W = G.work;
         dis('b-sabb', !W.canSabbatical(S));
         why('b-sabb', W.canSabbatical(S) ? '' : S.day - (S.job.since || 0) < 1800
-          ? `precisa de 5 anos na mesma empresa (faltam ${f.num((1800 - (S.day - (S.job.since || 0))) / 360, 1)})` : 'só um sabático a cada 7 anos');
+          ? tr(`precisa de 5 anos na mesma empresa (faltam ${f.num((1800 - (S.day - (S.job.since || 0))) / 360, 1)})`,
+            `needs 5 years at the same company (${f.num((1800 - (S.day - (S.job.since || 0))) / 360, 1)} to go)`)
+          : tr('só um sabático a cada 7 anos', 'only one sabbatical every 7 years'));
         if (S.tabs.estilo) {
           const LF = G.life;
           for (const id in LF.CITIES) {
@@ -405,16 +446,18 @@
             dis(`b-city-${id}`, S.cash < LF.cityCost(S, id));
             why(`b-city-${id}`, need(S, { cash: LF.cityCost(S, id) }));
           }
-          set('w-home', LF.homeOk(S) ? 'custo de vida −40%.'
-            : `pequeno para o padrão atual (precisa valer ${f.money(LF.homeMin(S))}), sem desconto no custo de vida.`);
+          set('w-home', LF.homeOk(S) ? tr('custo de vida −40%.', 'cost of living −40%.')
+            : tr(`pequeno para o padrão atual (precisa valer ${f.money(LF.homeMin(S))}), sem desconto no custo de vida.`,
+              `too small for your current lifestyle (must be worth ${f.money(LF.homeMin(S))}), no cost-of-living discount.`));
         }
         set('w-sal', f.money(W.salary(S)));
         set('w-ot', '+' + f.money(W.otGain(S)));
-        set('w-st', `+${f.num(W.studyGain(S), 1)} conhecimento`);
+        set('w-st', `+${f.num(W.studyGain(S), 1)} ${tr('conhecimento', 'knowledge')}`);
         dis('b-promote', !W.canPromote(S));
         const nx = W.nextLevel(S);
-        why('b-promote', !nx || W.canPromote(S) ? '' : !S.job.employed ? 'você está sem emprego'
-          : [S.knowledge < nx.k && `faltam ${f.num(nx.k - S.knowledge, 0)} de conhecimento`, S.reputation < nx.rep && `faltam ${f.num(nx.rep - S.reputation, 0)} de reputação`].filter(Boolean).join(' e '));
+        why('b-promote', !nx || W.canPromote(S) ? '' : !S.job.employed ? tr('você está sem emprego', 'you are unemployed')
+          : [S.knowledge < nx.k && tr(`faltam ${f.num(nx.k - S.knowledge, 0)} de conhecimento`, `${f.num(nx.k - S.knowledge, 0)} knowledge short`),
+            S.reputation < nx.rep && tr(`faltam ${f.num(nx.rep - S.reputation, 0)} de reputação`, `${f.num(nx.rep - S.reputation, 0)} reputation short`)].filter(Boolean).join(tr(' e ', ' and ')));
         dis('b-ot', !W.canAct(S, W.OT_COST));
         why('b-ot', need(S, { energy: W.OT_COST }));
         dis('b-study', !W.canAct(S, W.studyCost(S)));
@@ -426,10 +469,11 @@
           const free = W.freeEnergy(S), r = S.routine;
           const studyShare = r === 'estudar' || (r !== 'off' && S.job.retired) ? 1 : r === 'misto' ? 0.5 : 0;
           const perDay = [];
-          if (studyShare) perDay.push(`+${f.num((free * studyShare) / W.studyCost(S) * W.studyGain(S), 1)} conhecimento`);
+          if (studyShare) perDay.push(`+${f.num((free * studyShare) / W.studyCost(S) * W.studyGain(S), 1)} ${tr('conhecimento', 'knowledge')}`);
           if (studyShare < 1 && r !== 'off' && S.job.employed) perDay.push(`+${f.money((free * (1 - studyShare)) / W.OT_COST * W.otGain(S))}`);
-          if (studyShare < 1 && r !== 'off' && !S.job.employed && !S.job.retired) perDay.push('procurando emprego');
-          set('w-auto', r === 'off' ? 'mantém 25% de energia de reserva, sem risco de burnout' : `≈ ${perDay.join(' e ')} por dia`);
+          if (studyShare < 1 && r !== 'off' && !S.job.employed && !S.job.retired) perDay.push(tr('procurando emprego', 'job hunting'));
+          set('w-auto', r === 'off' ? tr('mantém 25% de energia de reserva, sem risco de burnout', 'keeps 25% energy in reserve, no burnout risk')
+            : `≈ ${perDay.join(tr(' e ', ' and '))} ${tr('por dia', 'per day')}`);
         }
         if (S.research.fire) {
           const nw = G.portfolio.netWorth(S), fire = W.fireNumber(S);
@@ -440,10 +484,10 @@
           dis('b-retire', !W.canRetire(S));
         }
         show('w-burn', S.burnout > 0);
-        set('w-burn', `Em burnout: mais ${S.burnout} dia(s) de descanso.`);
+        set('w-burn', tr(`Em burnout: mais ${S.burnout} dia(s) de descanso.`, `Burned out: ${S.burnout} more day(s) of rest.`));
         if (S.tabs.estilo) {
           W.LIFESTYLE.forEach((l, i) => {
-            set(`ls-c-${i}`, f.money(l.cost * S.macro.priceIndex * W.costMult(S)) + '/mês');
+            set(`ls-c-${i}`, f.money(l.cost * S.macro.priceIndex * W.costMult(S)) + tr('/mês', '/month'));
             dis(`b-ls-${i}`, S.cash < W.moveCost(S, i));
             why(`b-ls-${i}`, need(S, { cash: W.moveCost(S, i) }));
           });
@@ -454,24 +498,28 @@
     investimentos: {
       unlocked: S => Object.keys(G.ASSETS).filter(id => G.portfolio.unlocked(S, id)),
       shown(S) {
-        return this.unlocked(S).filter(id => invFilter === 'Todos' || G.ASSETS[id].cls === invFilter);
+        return this.unlocked(S).filter(id => invFilter === ALL || G.ASSETS[id].cls === invFilter);
       },
       key(S) {
         return [invFilter, this.unlocked(S).join(','), G.tax.exemptSales(S), !!S.research.aporte_auto, !!S.research.rebalanceamento, !!S.research.quant, !!S.research.cripto, !!S.research.tributacao, !!S.research.dividendos, !!S.research.fundamentalista].join('|');
       },
       build(S) {
-        const classes = ['Todos', ...new Set(this.unlocked(S).map(id => G.ASSETS[id].cls))];
-        if (!classes.includes(invFilter)) invFilter = 'Todos';
-        let h = `<section class="card summary"><span>Total investido <b id="i-tot"></b></span>
+        const classes = [ALL, ...new Set(this.unlocked(S).map(id => G.ASSETS[id].cls))];
+        if (!classes.includes(invFilter)) invFilter = ALL;
+        let h = tr(`<section class="card summary"><span>Total investido <b id="i-tot"></b></span>
           <span>Renda ~<b id="i-y"></b>/mês</span><span>Caixa livre <b id="i-cash"></b></span>
-          <span>IR pago <b id="i-tax"></b></span>`;
+          <span>IR pago <b id="i-tax"></b></span>`, `<section class="card summary"><span>Total invested <b id="i-tot"></b></span>
+          <span>Income ~<b id="i-y"></b>/month</span><span>Free cash <b id="i-cash"></b></span>
+          <span>Income tax paid <b id="i-tax"></b></span>`);
         if (S.research.tributacao) {
-          h += `<span>Vendas de ações no mês <b id="i-sales"></b> / ${f.money(G.tax.exemptSales(S))} isentos</span>
-            <span>IR a apurar <b id="i-pend"></b></span>`;
-          if (S.research.cripto) h += `<span>Vendas de cripto no mês <b id="i-csales"></b> / ${f.money(G.tax.CRYPTO_EXEMPT)} isentos</span>`;
+          h += tr(`<span>Vendas de ações no mês <b id="i-sales"></b> / ${f.money(G.tax.exemptSales(S))} isentos</span>
+            <span>IR a apurar <b id="i-pend"></b></span>`, `<span>Stock sales this month <b id="i-sales"></b> / ${f.money(G.tax.exemptSales(S))} exempt</span>
+            <span>Income tax due <b id="i-pend"></b></span>`);
+          if (S.research.cripto) h += tr(`<span>Vendas de cripto no mês <b id="i-csales"></b> / ${f.money(G.tax.CRYPTO_EXEMPT)} isentos</span>`,
+            `<span>Crypto sales this month <b id="i-csales"></b> / ${f.money(G.tax.CRYPTO_EXEMPT)} exempt</span>`);
         }
         if (S.research.dividendos) {
-          h += '<label class="check"><input type="checkbox" data-act="reinvest" id="i-reinv"> Reinvestir dividendos e aluguéis</label>';
+          h += `<label class="check"><input type="checkbox" data-act="reinvest" id="i-reinv"> ${tr('Reinvestir dividendos e aluguéis', 'Reinvest dividends and rents')}</label>`;
         }
         h += '</section>';
         if (S.research.aporte_auto) h += autoSection(S, this.unlocked(S));
@@ -481,22 +529,23 @@
         }
         for (const id of this.shown(S)) {
           const a = G.ASSETS[id], eq = a.kind === 'equity';
+          const buyW = eq ? tr('Comprar', 'Buy') : tr('Aplicar', 'Deposit'), sellW = eq ? tr('Vender', 'Sell') : tr('Resgatar', 'Withdraw');
           h += `<section class="card asset">
             <div class="asset-head"><h3>${a.n}</h3><span class="tag">${a.cls}</span><span class="yield" id="a-y-${id}"></span></div>
             <p class="muted">${a.d}</p>
-            <canvas class="spark zoom" id="a-c-${id}" data-act="chart" data-id="asset:${id}" title="Clique para ampliar"></canvas>
-            <div class="asset-pos"><span class="muted">Cota <span id="a-p-${id}"></span> <span id="a-dc-${id}"></span></span> ·
-              ${eq && id !== 'ibov' && S.research.fundamentalista ? `Valuation <b id="a-val-${id}"></b> · ` : ''}Posição <b id="a-v-${id}"></b> <span id="a-pl-${id}"></span> <span id="a-lock-${id}" class="muted"></span></div>
+            <canvas class="spark zoom" id="a-c-${id}" data-act="chart" data-id="asset:${id}" title="${tr('Clique para ampliar', 'Click to enlarge')}"></canvas>
+            <div class="asset-pos"><span class="muted">${tr('Cota', 'Price')} <span id="a-p-${id}"></span> <span id="a-dc-${id}"></span></span> ·
+              ${eq && id !== 'ibov' && S.research.fundamentalista ? `Valuation <b id="a-val-${id}"></b> · ` : ''}${tr('Posição', 'Position')} <b id="a-v-${id}"></b> <span id="a-pl-${id}"></span> <span id="a-lock-${id}" class="muted"></span></div>
             <div class="asset-ops">
-              <input id="a-in-${id}" inputmode="decimal" placeholder="valor em R$">
-              <button data-act="buy" data-id="${id}" id="b-buy-${id}">${eq ? 'Comprar' : 'Aplicar'}</button>
-              <button data-act="buymax" data-id="${id}" id="b-max-${id}">${eq ? 'Comprar' : 'Aplicar'} com todo o caixa</button>
-              <button data-act="sell" data-id="${id}" id="b-sell-${id}">${eq ? 'Vender' : 'Resgatar'}</button>
-              <button data-act="sellall" data-id="${id}" id="b-sellall-${id}">${eq ? 'Vender' : 'Resgatar'} tudo</button>
+              <input id="a-in-${id}" inputmode="decimal" placeholder="${tr('valor em R$', 'amount in R$')}">
+              <button data-act="buy" data-id="${id}" id="b-buy-${id}">${buyW}</button>
+              <button data-act="buymax" data-id="${id}" id="b-max-${id}">${buyW} ${tr('com todo o caixa', 'all cash')}</button>
+              <button data-act="sell" data-id="${id}" id="b-sell-${id}">${sellW}</button>
+              <button data-act="sellall" data-id="${id}" id="b-sellall-${id}">${sellW} ${tr('tudo', 'all')}</button>
             </div>
-            <div class="asset-ops"><span class="frac"><small>${eq ? 'Comprar' : 'Aplicar'} % do caixa:</small>${FRACS.map(x =>
+            <div class="asset-ops"><span class="frac"><small>${buyW} ${tr('% do caixa', '% of cash')}:</small>${FRACS.map(x =>
               `<button data-act="buyfrac" data-id="${id}" data-f="${x}" id="b-bf${x * 100}-${id}">${x * 100}%</button>`).join('')}</span>
-              <span class="frac"><small>${eq ? 'Vender' : 'Resgatar'} % da posição:</small>${FRACS.map(x =>
+              <span class="frac"><small>${sellW} ${tr('% da posição', '% of position')}:</small>${FRACS.map(x =>
               `<button data-act="sellfrac" data-id="${id}" data-f="${x}" id="b-sf${x * 100}-${id}">${x * 100}%</button>`).join('')}</span>
             </div></section>`;
         }
@@ -521,20 +570,20 @@
           const v = P.value(S, id), c = P.cost(S, id), lk = P.locked(S, id);
           const y = G.market.annualYield(S, id), h = S.market.hist[id];
           set(`a-y-${id}`, a.kind === 'equity'
-            ? `${a.divFreq === 12 ? 'Aluguéis' : 'Dividendos'} ${f.pct(y)} a.a.`
-            : `${f.pct(y)} a.a.${a.kind === 'pre' ? ' (taxa de mercado)' : ''}`);
+            ? `${a.divFreq === 12 ? tr('Aluguéis', 'Rents') : tr('Dividendos', 'Dividends')} ${f.pct(y)} ${tr('a.a.', 'p.a.')}`
+            : `${f.pct(y)} ${tr('a.a.', 'p.a.')}${a.kind === 'pre' ? tr(' (taxa de mercado)', ' (market rate)') : ''}`);
           set(`a-p-${id}`, f.money(S.market.prices[id] * (a.unit || 1)));
           const dc = $(`a-dc-${id}`);
           if (dc && h.length > 1) {
             const ch = h[h.length - 1] / h[h.length - 2] - 1;
-            dc.textContent = `(${f.signedPct(ch)} hoje)`;
+            dc.textContent = `(${f.signedPct(ch)} ${tr('hoje', 'today')})`;
             dc.className = ch >= 0 ? 'good' : 'bad';
           }
           set(`a-v-${id}`, f.money(v));
           const val = $(`a-val-${id}`);
           if (val) {
             const dev = S.market.idio[id] || 0;
-            val.textContent = dev > 0.15 ? 'caro' : dev < -0.15 ? 'barato' : 'justo';
+            val.textContent = dev > 0.15 ? tr('caro', 'expensive') : dev < -0.15 ? tr('barato', 'cheap') : tr('justo', 'fair');
             val.className = dev > 0.15 ? 'bad' : dev < -0.15 ? 'good' : '';
           }
           const pl = $(`a-pl-${id}`);
@@ -542,15 +591,16 @@
             pl.textContent = c > 0 ? `${f.money(v - c)} (${f.signedPct(v / c - 1)})` : '';
             pl.className = v >= c ? 'good' : 'bad';
           }
-          set(`a-lock-${id}`, lk.value > 0.01 ? `· ${f.money(lk.value)} em carência (próxima liberação em ${lk.inDays} dias)` : '');
+          set(`a-lock-${id}`, lk.value > 0.01 ? tr(`· ${f.money(lk.value)} em carência (próxima liberação em ${lk.inDays} dias)`,
+            `· ${f.money(lk.value)} locked (next release in ${lk.inDays} days)`) : '');
           const noCash = S.cash < 0.01, noPos = v - lk.value < 0.01;
           for (const bid of [`b-buy-${id}`, `b-max-${id}`, ...FRACS.map(x => `b-bf${x * 100}-${id}`)]) {
             dis(bid, noCash);
-            why(bid, noCash ? 'sem caixa livre' : '');
+            why(bid, noCash ? tr('sem caixa livre', 'no free cash') : '');
           }
           for (const bid of [`b-sell-${id}`, `b-sellall-${id}`, ...FRACS.map(x => `b-sf${x * 100}-${id}`)]) {
             dis(bid, noPos);
-            why(bid, noPos ? (lk.value > 0.01 ? 'tudo em carência' : 'sem posição') : '');
+            why(bid, noPos ? (lk.value > 0.01 ? tr('tudo em carência', 'all locked') : tr('sem posição', 'no position')) : '');
           }
           spark(`a-c-${id}`, h, { ma: S.research.analise_tecnica && a.kind === 'equity' ? 200 : 0 });
         }
@@ -562,8 +612,8 @@
       build(S) {
         const R = G.research;
         const done = G.RESEARCH.filter(r => S.research[r.id]).length;
-        let h = `<section class="card summary"><span>Conhecimento <b id="k-have"></b></span>
-          <span>Ganho passivo <b id="k-rate"></b>/dia</span><span>Pesquisas <b>${done}/${G.RESEARCH.length}</b></span></section>`;
+        let h = `<section class="card summary"><span>${tr('Conhecimento', 'Knowledge')} <b id="k-have"></b></span>
+          <span>${tr('Ganho passivo', 'Passive gain')} <b id="k-rate"></b>/${tr('dia', 'day')}</span><span>${tr('Pesquisas', 'Research')} <b>${done}/${G.RESEARCH.length}</b></span></section>`;
         for (const [b, name] of G.BRANCHES) {
           const nodes = G.RESEARCH.filter(r => r.b === b);
           const avail = nodes.filter(r => R.visible(S, r));
@@ -574,14 +624,14 @@
           h += `<section class="card"><h3>${name} <small>${owned.length}/${nodes.length}</small></h3>`;
           for (const r of avail) {
             h += `<div class="research"><div><b>${r.n}</b><p class="muted">${r.d}</p></div>
-              <button data-act="research" data-id="${r.id}" id="b-r-${r.id}">Pesquisar <small>${r.k} conhecimento${r.cost ? ' + ' + f.money(r.cost) : ''}</small></button></div>`;
+              <button data-act="research" data-id="${r.id}" id="b-r-${r.id}">${tr('Pesquisar', 'Research')} <small>${r.k} ${tr('conhecimento', 'knowledge')}${r.cost ? ' + ' + f.money(r.cost) : ''}</small></button></div>`;
           }
           for (const r of teased) {
             const missing = r.req.filter(q => !S.research[q]).map(q => R.byId(q).n).join(', ');
-            h += `<div class="research locked"><div><b>${r.n}</b><p class="muted">Requer: ${missing}</p></div></div>`;
+            h += `<div class="research locked"><div><b>${r.n}</b><p class="muted">${tr('Requer', 'Requires')}: ${missing}</p></div></div>`;
           }
           for (const r of owned) h += `<div class="research done"><div><b>✓ ${r.n}</b> <span class="muted">${r.d}</span></div></div>`;
-          if (hidden > 0) h += `<p class="muted">+ ${hidden} pesquisa(s) ainda oculta(s)</p>`;
+          if (hidden > 0) h += `<p class="muted">${tr(`+ ${hidden} pesquisa(s) ainda oculta(s)`, `+ ${hidden} more hidden research item(s)`)}</p>`;
           h += '</section>';
         }
         return h;
@@ -593,7 +643,7 @@
         set('k-rate', '+' + f.num(rate, 2));
         for (const r of G.RESEARCH) {
           dis(`b-r-${r.id}`, !G.research.affordable(S, r));
-          why(`b-r-${r.id}`, S.knowledge < r.k ? `faltam ${f.num(r.k - S.knowledge, 1)} de conhecimento` : need(S, { cash: r.cost || 0 }));
+          why(`b-r-${r.id}`, S.knowledge < r.k ? tr(`faltam ${f.num(r.k - S.knowledge, 1)} de conhecimento`, `${f.num(r.k - S.knowledge, 1)} knowledge short`) : need(S, { cash: r.cost || 0 }));
         }
       },
     },
@@ -602,51 +652,73 @@
       key: S => ['macro1', 'macro2', 'curva', 'rv1', 'sentimento', 'pmi', 'focus', 'cripto', 'ciclo_cripto'].map(r => +!!S.research[r]).join(''),
       build(S) {
         const R = S.research;
-        let h = `<section class="card"><h3>Juros</h3>
+        const zoomTip = tr('Clique para ampliar', 'Click to enlarge');
+        let h = `<section class="card"><h3>${tr('Juros', 'Interest rates')}</h3>
           <p>Selic: <b id="m-selic"></b> <span id="m-bias" class="muted"></span></p>
-          <canvas class="spark tall zoom" id="m-selic-c" data-act="chart" data-id="selic" title="Clique para ampliar"></canvas>
-          <p class="muted">Histórico das decisões do Copom (a cada 45 dias).</p>`;
-        if (R.macro1) h += '<p>Próximo Copom em <b id="m-copom"></b>.</p>';
-        if (R.focus) h += '<p>Boletim Focus: o mercado espera Selic de <b id="m-focus"></b> daqui a 12 meses.</p>';
+          <canvas class="spark tall zoom" id="m-selic-c" data-act="chart" data-id="selic" title="${zoomTip}"></canvas>
+          <p class="muted">${tr('Histórico das decisões do Copom (a cada 45 dias).', 'History of Copom rate decisions (every 45 days).')}</p>`;
+        if (R.macro1) h += tr('<p>Próximo Copom em <b id="m-copom"></b>.</p>', '<p>Next Copom meeting in <b id="m-copom"></b>.</p>');
+        if (R.focus) h += tr('<p>Boletim Focus: o mercado espera Selic de <b id="m-focus"></b> daqui a 12 meses.</p>',
+          '<p>Focus survey: the market expects a Selic of <b id="m-focus"></b> 12 months from now.</p>');
         h += '</section>';
         if (R.macro1) {
-          h += `<section class="card"><h3>Inflação</h3>
+          h += tr(`<section class="card"><h3>Inflação</h3>
             <p>Inflação corrente: <b id="m-infl"></b> a.a. · Juro real: <b id="m-real"></b></p>
-            <p class="muted">Custo de vida acumulado desde o início: <b id="m-pi"></b></p></section>`;
+            <p class="muted">Custo de vida acumulado desde o início: <b id="m-pi"></b></p></section>`,
+            `<section class="card"><h3>Inflation</h3>
+            <p>Current inflation: <b id="m-infl"></b> p.a. · Real rate: <b id="m-real"></b></p>
+            <p class="muted">Cumulative cost of living since the start: <b id="m-pi"></b></p></section>`);
         }
         if (R.pmi) {
-          h += `<section class="card"><h3>Indicadores</h3>
+          h += tr(`<section class="card"><h3>Indicadores</h3>
             <p>PMI da indústria: <b id="m-pmi"></b> <span class="muted">(acima de 50, a indústria cresce; costuma virar antes do ciclo)</span></p>
-            <canvas class="spark tall zoom" id="m-pmi-c" data-act="chart" data-id="pmi" title="Clique para ampliar"></canvas>
-            <p>Desemprego: <b id="m-unemp"></b> <span class="muted">(reage devagar; confirma o ciclo depois que ele já virou)</span></p></section>`;
+            <canvas class="spark tall zoom" id="m-pmi-c" data-act="chart" data-id="pmi" title="${zoomTip}"></canvas>
+            <p>Desemprego: <b id="m-unemp"></b> <span class="muted">(reage devagar; confirma o ciclo depois que ele já virou)</span></p></section>`,
+            `<section class="card"><h3>Indicators</h3>
+            <p>Manufacturing PMI: <b id="m-pmi"></b> <span class="muted">(above 50, industry is growing; it usually turns before the cycle)</span></p>
+            <canvas class="spark tall zoom" id="m-pmi-c" data-act="chart" data-id="pmi" title="${zoomTip}"></canvas>
+            <p>Unemployment: <b id="m-unemp"></b> <span class="muted">(reacts slowly; confirms the cycle after it has already turned)</span></p></section>`);
         }
         if (R.macro2) {
-          h += `<section class="card"><h3>Ciclo econômico</h3>
+          h += tr(`<section class="card"><h3>Ciclo econômico</h3>
             <p>Leitura deste mês: <b id="m-cycle"></b></p>
-            <p class="muted">Estimativa com ruído (${R.curva ? '~85%' : '~60%'} de acerto). Ciclo típico: Expansão → Pico → Recessão → Recuperação.</p></section>`;
+            <p class="muted">Estimativa com ruído (${R.curva ? '~85%' : '~60%'} de acerto). Ciclo típico: Expansão → Pico → Recessão → Recuperação.</p></section>`,
+            `<section class="card"><h3>Business cycle</h3>
+            <p>This month's reading: <b id="m-cycle"></b></p>
+            <p class="muted">Noisy estimate (${R.curva ? '~85%' : '~60%'} accurate). Typical cycle: Expansion → Peak → Recession → Recovery.</p></section>`);
         }
         if (R.curva) {
-          h += `<section class="card"><h3>Curva de juros</h3>
-            <p>Prefixado <b id="m-pre"></b> vs Selic <b id="m-selic2"></b> → <b id="m-curve"></b></p></section>`;
+          h += tr(`<section class="card"><h3>Curva de juros</h3>
+            <p>Prefixado <b id="m-pre"></b> vs Selic <b id="m-selic2"></b> → <b id="m-curve"></b></p></section>`,
+            `<section class="card"><h3>Yield curve</h3>
+            <p>Fixed-rate <b id="m-pre"></b> vs Selic <b id="m-selic2"></b> → <b id="m-curve"></b></p></section>`);
         }
         if (R.rv1) {
-          h += `<section class="card"><h3>Bolsa</h3>
-            <p>Ibovespa: <b id="m-ibov"></b> pts · <span id="m-ibov12"></span> em 12 meses</p>
-            <canvas class="spark tall zoom" id="m-ibov-c" data-act="chart" data-id="asset:ibov" title="Clique para ampliar"></canvas>`;
+          h += tr(`<section class="card"><h3>Bolsa</h3>
+            <p>Ibovespa: <b id="m-ibov"></b> pts · <span id="m-ibov12"></span> em 12 meses</p>`, `<section class="card"><h3>Stock market</h3>
+            <p>Ibovespa: <b id="m-ibov"></b> pts · <span id="m-ibov12"></span> over 12 months</p>`) +
+            `<canvas class="spark tall zoom" id="m-ibov-c" data-act="chart" data-id="asset:ibov" title="${zoomTip}"></canvas>`;
           if (R.sentimento) {
-            h += `<p>Medo e ganância: <b id="m-fg"></b> <span class="muted">(quando todos estão gananciosos, cuidado; quando têm medo, oportunidade)</span></p>
-              <p>P/L do Ibovespa: <b id="m-pe"></b> <span class="muted">(média histórica ≈ 9; bolsa cara tende a render menos daqui para frente)</span></p>`;
+            h += tr(`<p>Medo e ganância: <b id="m-fg"></b> <span class="muted">(quando todos estão gananciosos, cuidado; quando têm medo, oportunidade)</span></p>
+              <p>P/L do Ibovespa: <b id="m-pe"></b> <span class="muted">(média histórica ≈ 9; bolsa cara tende a render menos daqui para frente)</span></p>`,
+              `<p>Fear & greed: <b id="m-fg"></b> <span class="muted">(when everyone is greedy, be careful; when they're afraid, opportunity)</span></p>
+              <p>Ibovespa P/E: <b id="m-pe"></b> <span class="muted">(historical average ≈ 9; an expensive market tends to return less from here)</span></p>`);
           }
           h += '</section>';
         }
         if (R.cripto) {
-          h += `<section class="card"><h3>Cripto</h3>
-            <p>Bitcoin: <b id="m-btc"></b> · <span id="m-btc12"></span> em 12 meses · próximo halving: <b id="m-halving"></b></p>`;
-          if (R.ciclo_cripto) h += '<p>Fase do ciclo: <b id="m-cphase"></b> <span class="muted">(pós-halving → euforia → estouro → inverno → acumulação)</span></p>';
+          h += tr(`<section class="card"><h3>Cripto</h3>
+            <p>Bitcoin: <b id="m-btc"></b> · <span id="m-btc12"></span> em 12 meses · próximo halving: <b id="m-halving"></b></p>`,
+            `<section class="card"><h3>Crypto</h3>
+            <p>Bitcoin: <b id="m-btc"></b> · <span id="m-btc12"></span> over 12 months · next halving: <b id="m-halving"></b></p>`);
+          if (R.ciclo_cripto) h += tr('<p>Fase do ciclo: <b id="m-cphase"></b> <span class="muted">(pós-halving → euforia → estouro → inverno → acumulação)</span></p>',
+            '<p>Cycle phase: <b id="m-cphase"></b> <span class="muted">(post-halving → euphoria → bust → winter → accumulation)</span></p>');
           h += '</section>';
         }
-        h += `<section class="card"><h3>Política</h3>
-          <p>Governo: <b id="m-policy"></b> · Próxima eleição: <b id="m-elec"></b></p></section>`;
+        h += tr(`<section class="card"><h3>Política</h3>
+          <p>Governo: <b id="m-policy"></b> · Próxima eleição: <b id="m-elec"></b></p></section>`,
+          `<section class="card"><h3>Politics</h3>
+          <p>Government: <b id="m-policy"></b> · Next election: <b id="m-elec"></b></p></section>`);
         return h;
       },
       update(S) {
@@ -655,8 +727,8 @@
         spark('m-selic-c', m.selicHist, { neutral: true });
         if (S.research.macro1) {
           const bias = t.selic - m.selic + (m.infl - t.infl) * 0.5;
-          set('m-bias', bias > 0.002 ? '· viés de alta' : bias < -0.002 ? '· viés de baixa' : '· viés neutro');
-          set('m-copom', `${Math.max(0, m.nextCopom - S.day)} dias`);
+          set('m-bias', bias > 0.002 ? tr('· viés de alta', '· hawkish bias') : bias < -0.002 ? tr('· viés de baixa', '· dovish bias') : tr('· viés neutro', '· neutral bias'));
+          set('m-copom', `${Math.max(0, m.nextCopom - S.day)} ${tr('dias', 'days')}`);
           set('m-infl', f.pct(m.infl));
           set('m-real', f.pct((1 + m.selic) / (1 + m.infl) - 1));
           set('m-pi', f.signedPct(m.priceIndex - 1, 1));
@@ -667,13 +739,13 @@
           spark('m-pmi-c', m.pmiHist, { neutral: true });
           set('m-unemp', f.pct(m.shown.unemp, 1));
         }
-        if (S.research.macro2) set('m-cycle', m.perceived ? G.macro.REGIMES[m.perceived].n : 'aguardando dados do mês');
+        if (S.research.macro2) set('m-cycle', m.perceived ? G.macro.REGIMES[m.perceived].n : tr('aguardando dados do mês', 'waiting for this month\'s data'));
         if (S.research.curva) {
           const spread = S.market.pre - m.selic;
           set('m-pre', f.pct(S.market.pre));
           set('m-selic2', f.pct(m.selic));
-          set('m-curve', spread > 0.01 ? 'inclinada: mercado espera alta de juros'
-            : spread < -0.005 ? 'invertida: mercado espera cortes (recessão à vista?)' : 'plana');
+          set('m-curve', spread > 0.01 ? tr('inclinada: mercado espera alta de juros', 'steep: the market expects rate hikes')
+            : spread < -0.005 ? tr('invertida: mercado espera cortes (recessão à vista?)', 'inverted: the market expects cuts (recession ahead?)') : tr('plana', 'flat'));
         }
         if (S.research.rv1) {
           const h = S.market.hist.ibov, r12 = h[h.length - 1] / h[Math.max(0, h.length - 361)] - 1;
@@ -684,7 +756,8 @@
           spark('m-ibov-c', h, { ma: S.research.analise_tecnica ? 200 : 0 });
           const fg = S.market.fg;
           set('m-pe', f.num(G.market.pe(S), 1));
-          set('m-fg', `${Math.round(fg)} · ${fg < 25 ? 'medo extremo' : fg < 45 ? 'medo' : fg < 55 ? 'neutro' : fg < 75 ? 'ganância' : 'ganância extrema'}`);
+          set('m-fg', `${Math.round(fg)} · ${fg < 25 ? tr('medo extremo', 'extreme fear') : fg < 45 ? tr('medo', 'fear') : fg < 55 ? tr('neutro', 'neutral')
+            : fg < 75 ? tr('ganância', 'greed') : tr('ganância extrema', 'extreme greed')}`);
         }
         if (S.research.cripto) {
           const hb = S.market.hist.bitcoin, r12 = hb[hb.length - 1] / hb[Math.max(0, hb.length - 361)] - 1;
@@ -696,7 +769,7 @@
           set('m-cphase', G.market.cryptoPhase(S.day));
         }
         set('m-policy', G.macro.POLICIES[m.policy].n);
-        set('m-elec', `out/${G.cal.nextElection(S.day)}`);
+        set('m-elec', `${f.MESES[9]}/${G.cal.nextElection(S.day)}`);
       },
     },
 
@@ -709,73 +782,83 @@
       },
       build(S) {
         const SO = G.social, so = S.social, t = SO.tierIdx(S);
-        let h = `<section class="card summary"><span>Posição social <b>${SO.tierName(S)}</b></span>
-          <span>Prestígio <b id="v-prest"></b></span><span>Visibilidade <b id="v-vis"></b></span>
+        let h = `<section class="card summary"><span>${tr('Posição social', 'Social status')} <b>${SO.tierName(S)}</b></span>
+          <span>${tr('Prestígio', 'Prestige')} <b id="v-prest"></b></span><span>${tr('Visibilidade', 'Visibility')} <b id="v-vis"></b></span>
           <span>Stress <b id="v-stress"></b></span><span id="v-next" class="muted"></span>
-          <span id="v-nr" class="bad" hidden>Visibilidade muito acima do prestígio: fama de novo-rico atrai crítica e golpistas.</span></section>`;
+          <span id="v-nr" class="bad" hidden>${tr('Visibilidade muito acima do prestígio: fama de novo-rico atrai crítica e golpistas.',
+            'Visibility far above prestige: a nouveau-riche reputation attracts criticism and con artists.')}</span></section>`;
 
         // Hábitos
-        h += `<section class="card"><h3>Hábitos <small id="v-slots"></small></h3>
-          <p class="muted">Um hábito leva ${SO.formDays(S)} dias para se formar e custa energia todo dia nesse período; depois fica quase de graça.
-          Stress acima de 70 pode quebrar hábitos já formados.</p><table class="tbl">`;
+        h += `<section class="card"><h3>${tr('Hábitos', 'Habits')} <small id="v-slots"></small></h3>
+          <p class="muted">${tr(`Um hábito leva ${SO.formDays(S)} dias para se formar e custa energia todo dia nesse período; depois fica quase de graça.
+          Stress acima de 70 pode quebrar hábitos já formados.`, `A habit takes ${SO.formDays(S)} days to form and costs energy every day during that time; after that it's almost free.
+          Stress above 70 can break habits already formed.`)}</p><table class="tbl">`;
         for (const id of Object.keys(so.habits)) {
           const d = SO.HABITS[id];
           h += `<tr><td><b class="${d.good ? '' : 'bad'}">${d.n}</b><br><small class="muted">${d.d}</small></td>
-            <td id="v-h-${id}"></td><td><button data-act="habit-drop" data-id="${id}" id="b-hd-${id}">${d.good ? 'Abandonar' : 'Largar'}</button></td></tr>`;
+            <td id="v-h-${id}"></td><td><button data-act="habit-drop" data-id="${id}" id="b-hd-${id}">${d.good ? tr('Abandonar', 'Drop') : tr('Largar', 'Quit')}</button></td></tr>`;
         }
         h += '</table><div class="btns">';
         for (const [id, d] of Object.entries(SO.HABITS)) {
           if (!d.good || so.habits[id]) continue;
           h += `<button data-act="habit-start" data-id="${id}" id="b-hs-${id}" title="${esc(d.d)}">${d.n}
-            <small>${d.cost} energia/dia para formar · ${esc(d.d)}</small></button>`;
+            <small>${d.cost} ${tr('energia/dia para formar', 'energy/day to form')} · ${esc(d.d)}</small></button>`;
         }
         h += '</div></section>';
 
         // Vida social
-        h += '<section class="card"><h3>Vida social</h3><div class="btns">';
+        h += `<section class="card"><h3>${tr('Vida social', 'Social life')}</h3><div class="btns">`;
         for (const a of SO.ACTIVITIES) {
           if ((a.tier || 0) > t + 1 || (a.req && !S.research[a.req])) continue;
           const locked = (a.tier || 0) > t;
-          const gains = [a.vis && `+${a.vis} visib.`, a.prest && `+${a.prest} prestígio`, a.know && `+${a.know} conhec.`, a.fee && 'cachê'].filter(Boolean).join(', ');
+          const gains = [a.vis && `+${a.vis} ${tr('visib.', 'visib.')}`, a.prest && `+${a.prest} ${tr('prestígio', 'prestige')}`,
+            a.know && `+${a.know} ${tr('conhec.', 'knowl.')}`, a.fee && tr('cachê', 'fee')].filter(Boolean).join(', ');
           h += `<button data-act="social" data-id="${a.id}" id="b-sa-${a.id}">${a.n}
-            <small>${locked ? `requer ${SO.TIERS[a.tier][1]}` : `${a.energy} energia${a.cost ? ' · <span id="v-ac-' + a.id + '"></span>' : ''} · ${gains}`}</small></button>`;
+            <small>${locked ? `${tr('requer', 'requires')} ${SO.TIERS[a.tier][1]}` : `${a.energy} ${tr('energia', 'energy')}${a.cost ? ' · <span id="v-ac-' + a.id + '"></span>' : ''} · ${gains}`}</small></button>`;
         }
         h += '</div></section>';
 
         // Clubes
         if (S.research.etiqueta) {
-          h += '<section class="card"><h3>Clubes</h3><table class="tbl">';
+          h += `<section class="card"><h3>${tr('Clubes', 'Clubs')}</h3><table class="tbl">`;
           for (const c of SO.CLUBS) {
             const member = so.clubs[c.id];
             h += `<tr><td><b>${c.n}</b><br><small class="muted">${c.d}</small></td><td id="v-cf-${c.id}"></td>
-              <td>${member ? `<button data-act="club-leave" data-id="${c.id}">Sair</button>`
-                : c.tier > t ? `<small class="muted">requer ${SO.TIERS[c.tier][1]}</small>`
-                : `<button data-act="club-join" data-id="${c.id}" id="b-cj-${c.id}">Entrar <small id="v-cj-${c.id}"></small></button>`}</td></tr>`;
+              <td>${member ? `<button data-act="club-leave" data-id="${c.id}">${tr('Sair', 'Leave')}</button>`
+                : c.tier > t ? `<small class="muted">${tr('requer', 'requires')} ${SO.TIERS[c.tier][1]}</small>`
+                : `<button data-act="club-join" data-id="${c.id}" id="b-cj-${c.id}">${tr('Entrar', 'Join')} <small id="v-cj-${c.id}"></small></button>`}</td></tr>`;
           }
           h += '</table></section>';
         }
 
         // Consumo e filantropia
-        h += '<section class="card"><h3>Consumo</h3><p class="muted">Visibilidade na hora, mas ela some rápido (cai 10% ao mês).</p><div class="btns">';
+        h += tr('<section class="card"><h3>Consumo</h3><p class="muted">Visibilidade na hora, mas ela some rápido (cai 10% ao mês).</p><div class="btns">',
+          '<section class="card"><h3>Spending</h3><p class="muted">Instant visibility, but it fades fast (drops 10% per month).</p><div class="btns">');
         for (const l of SO.LUXURY) {
           if ((l.tier || 0) > t) continue;
-          h += `<button data-act="luxury" data-id="${l.id}" id="b-lx-${l.id}">${l.n} <small><span id="v-lx-${l.id}"></span> · +${l.vis} visib.${l.stress ? ', −stress' : ''}</small></button>`;
+          h += `<button data-act="luxury" data-id="${l.id}" id="b-lx-${l.id}">${l.n} <small><span id="v-lx-${l.id}"></span> · +${l.vis} ${tr('visib.', 'visib.')}${l.stress ? ', −stress' : ''}</small></button>`;
         }
-        h += `</div></section><section class="card"><h3>Filantropia</h3>
+        h += tr(`</div></section><section class="card"><h3>Filantropia</h3>
           <p class="muted">Doar gera prestígio durável. Total doado: <b id="v-don"></b></p>
-          <p><input id="v-don-in" inputmode="decimal" placeholder="valor em R$"> <button data-act="donate">Doar</button></p></section>`;
+          <p><input id="v-don-in" inputmode="decimal" placeholder="valor em R$"> <button data-act="donate">Doar</button></p></section>`,
+          `</div></section><section class="card"><h3>Philanthropy</h3>
+          <p class="muted">Giving builds lasting prestige. Total donated: <b id="v-don"></b></p>
+          <p><input id="v-don-in" inputmode="decimal" placeholder="amount in R$"> <button data-act="donate">Donate</button></p></section>`);
 
         // Família
         const f = so.family;
-        h += `<section class="card"><h3>Família</h3><p>${f.married ? 'Casado(a)' : 'Solteiro(a)'} · ${f.kids} filho(s)
+        h += tr(`<section class="card"><h3>Família</h3><p>${f.married ? 'Casado(a)' : 'Solteiro(a)'} · ${f.kids} filho(s)
           ${f.married && f.spouseIncome ? ' · renda do cônjuge <b id="v-sp"></b>/mês' : ''}</p>
-          <p class="muted">Casar aumenta o custo de vida em 40% e reduz o stress; cada filho, +25%. Sem filhos, não há herdeiro para o seu legado.</p><div class="btns">`;
+          <p class="muted">Casar aumenta o custo de vida em 40% e reduz o stress; cada filho, +25%. Sem filhos, não há herdeiro para o seu legado.</p><div class="btns">`,
+          `<section class="card"><h3>Family</h3><p>${f.married ? 'Married' : 'Single'} · ${f.kids} ${f.kids === 1 ? 'child' : 'children'}
+          ${f.married && f.spouseIncome ? ' · spouse income <b id="v-sp"></b>/month' : ''}</p>
+          <p class="muted">Marriage raises the cost of living by 40% and lowers stress; each child, +25%. Without children, there is no heir for your legacy.</p><div class="btns">`);
         if (!f.married) {
-          h += `<button data-act="marry" data-id="0" id="b-m0">Casar <small id="v-m0"></small></button>
-            <button data-act="marry" data-id="1" id="b-m1">Casamento de revista <small id="v-m1"></small></button>`;
-        } else h += `<button data-act="kid" id="b-kid">Ter um filho <small id="v-kid"></small></button>`;
-        if (f.kids) h += `<button data-act="school">${f.school ? 'Tirar da escola particular' : 'Escola particular'} <small id="v-sch"></small></button>`;
-        h += '</div></section>';
+          h += `<button data-act="marry" data-id="0" id="b-m0">${tr('Casar', 'Get married')} <small id="v-m0"></small></button>
+            <button data-act="marry" data-id="1" id="b-m1">${tr('Casamento de revista', 'Society-page wedding')} <small id="v-m1"></small></button>`;
+        } else h += `<button data-act="kid" id="b-kid">${tr('Ter um filho', 'Have a child')} <small id="v-kid"></small></button>`;
+        if (f.kids) h += `<button data-act="school">${f.school ? tr('Tirar da escola particular', 'Leave private school') : tr('Escola particular', 'Private school')} <small id="v-sch"></small></button>`;
+        h += '</div><p id="v-kidst"></p></section>';
         return h;
       },
       update(S) {
@@ -786,26 +869,26 @@
         st.textContent = f.num(so.stress, 0);
         st.className = so.stress > 70 ? 'bad' : '';
         const nx = SO.nextTier(S);
-        set('v-next', nx ? `faltam ${f.num(nx[0] - SO.score(S), 1)} pontos para ${nx[1]}` : '');
+        set('v-next', nx ? tr(`faltam ${f.num(nx[0] - SO.score(S), 1)} pontos para ${nx[1]}`, `${f.num(nx[0] - SO.score(S), 1)} points to ${nx[1]}`) : '');
         show('v-nr', SO.nouveauRiche(S));
-        set('v-slots', `${SO.used(S)}/${SO.slots(S)} vagas`);
+        set('v-slots', `${SO.used(S)}/${SO.slots(S)} ${tr('vagas', 'slots')}`);
         for (const [id, h] of Object.entries(so.habits)) {
-          set(`v-h-${id}`, h.state === 'forming' ? `formando: ${h.days}/${SO.formDays(S)} dias`
-            : h.state === 'quitting' ? `largando: ${h.days}/${SO.QUIT_DAYS} dias` : 'formado');
+          set(`v-h-${id}`, h.state === 'forming' ? tr(`formando: ${h.days}/${SO.formDays(S)} dias`, `forming: ${h.days}/${SO.formDays(S)} days`)
+            : h.state === 'quitting' ? tr(`largando: ${h.days}/${SO.QUIT_DAYS} dias`, `quitting: ${h.days}/${SO.QUIT_DAYS} days`) : tr('formado', 'formed'));
           dis(`b-hd-${id}`, h.state === 'quitting');
         }
         for (const id of Object.keys(SO.HABITS)) dis(`b-hs-${id}`, SO.used(S) >= SO.slots(S));
         for (const a of SO.ACTIVITIES) {
           dis(`b-sa-${a.id}`, !SO.canDo(S, a));
-          why(`b-sa-${a.id}`, SO.canDo(S, a) ? '' : (a.tier || 0) > t ? `requer posição ${SO.TIERS[a.tier][1]}`
-            : a.season && G.cal.season(S.day).id !== a.season ? 'só no outono'
-            : a.cooldown && S.day < (so.cooldowns[a.id] || 0) ? `de novo em ${so.cooldowns[a.id] - S.day} dias`
+          why(`b-sa-${a.id}`, SO.canDo(S, a) ? '' : (a.tier || 0) > t ? tr(`requer posição ${SO.TIERS[a.tier][1]}`, `requires ${SO.TIERS[a.tier][1]} status`)
+            : a.season && G.cal.season(S.day).id !== a.season ? tr('só no outono', 'autumn only')
+            : a.cooldown && S.day < (so.cooldowns[a.id] || 0) ? tr(`de novo em ${so.cooldowns[a.id] - S.day} dias`, `available again in ${so.cooldowns[a.id] - S.day} days`)
             : need(S, { energy: a.energy, cash: a.cost * pi }));
           if (a.cost) set(`v-ac-${a.id}`, f.money(a.cost * pi));
         }
         for (const c of SO.CLUBS) {
-          set(`v-cf-${c.id}`, f.money(c.fee * pi) + '/mês');
-          set(`v-cj-${c.id}`, `joia ${f.money(6 * c.fee * pi)}`);
+          set(`v-cf-${c.id}`, f.money(c.fee * pi) + tr('/mês', '/month'));
+          set(`v-cj-${c.id}`, `${tr('joia', 'joining fee')} ${f.money(6 * c.fee * pi)}`);
           dis(`b-cj-${c.id}`, S.cash < 6 * c.fee * pi);
           why(`b-cj-${c.id}`, need(S, { cash: 6 * c.fee * pi }));
         }
@@ -819,14 +902,21 @@
         set('v-sp', f.money(fam.spouseIncome * pi));
         set('v-m0', f.money(60000 * pi));
         set('v-m1', f.money(800000 * pi) + ' · +20 visib.');
-        set('v-kid', f.money(20000 * pi) + ' + custo de vida');
-        set('v-sch', f.money(4000 * pi) + '/mês por filho · prestígio');
+        set('v-kid', f.money(SO.KID_COST * pi) + tr(' + custo de vida · 9 meses de gravidez', ' + cost of living · 9-month pregnancy'));
+        set('v-sch', f.money(4000 * pi) + tr('/mês por filho · prestígio', '/month per child · prestige'));
         dis('b-m0', S.cash < 60000 * pi);
         dis('b-m1', S.cash < 800000 * pi);
-        dis('b-kid', S.cash < 20000 * pi);
+        const ks = SO.kidState(S), months = d => Math.max(1, Math.ceil((d - S.day) / 30));
+        const kidMsg = ks === 'trying' ? tr('Vocês estão tentando engravidar.', 'You are trying to get pregnant.')
+          : ks === 'pregnant' ? tr(`Bebê a caminho: nasce em ~${months(fam.pregnant.due)} mês(es), em ${f.monthYear(fam.pregnant.due)}.`,
+            `Baby on the way: due in ~${months(fam.pregnant.due)} month(s), in ${f.monthYear(fam.pregnant.due)}.`)
+          : ks === 'recovering' ? tr(`Recuperação do parto: dá para tentar outro filho em ~${months(fam.nextKid)} mês(es).`,
+            `Recovering from the birth: you can try for another child in ~${months(fam.nextKid)} month(s).`) : '';
+        set('v-kidst', fam.married || ks === 'pregnant' ? kidMsg : '');
+        dis('b-kid', ks !== 'ready' || S.cash < SO.KID_COST * pi);
         why('b-m0', need(S, { cash: 60000 * pi }));
         why('b-m1', need(S, { cash: 800000 * pi }));
-        why('b-kid', need(S, { cash: 20000 * pi }));
+        why('b-kid', ks !== 'ready' ? kidMsg : need(S, { cash: SO.KID_COST * pi }));
       },
     },
 
@@ -838,56 +928,72 @@
       },
       build(S) {
         const LF = G.life, lf = S.life;
-        let h = `<section class="card summary"><span>Bem-estar <b id="lz-well"></b></span><span>Média da vida <b id="lz-avg"></b></span>
+        let h = tr(`<section class="card summary"><span>Bem-estar <b id="lz-well"></b></span><span>Média da vida <b id="lz-avg"></b></span>
           <span>Stress <b id="lz-stress"></b></span><span id="lz-away" class="good"></span></section>
-          <p class="muted">Bem-estar vem de família, saúde, hobbies, férias e pouco stress. A média da vida também vira pontos de legado.</p>`;
+          <p class="muted">Bem-estar vem de família, saúde, hobbies, férias e pouco stress. A média da vida também vira pontos de legado.</p>`,
+          `<section class="card summary"><span>Well-being <b id="lz-well"></b></span><span>Lifetime average <b id="lz-avg"></b></span>
+          <span>Stress <b id="lz-stress"></b></span><span id="lz-away" class="good"></span></section>
+          <p class="muted">Well-being comes from family, health, hobbies, vacations and low stress. The lifetime average also turns into legacy points.</p>`);
 
         // Férias
-        h += `<section class="card"><h3>Férias <small id="lz-vac"></small></h3>
+        h += tr(`<section class="card"><h3>Férias <small id="lz-vac"></small></h3>
           <p class="muted">Uma viagem por ano. Durante as férias você não trabalha nem estuda (a energia fica cheia) e empresas sem gerente ficam largadas.
-          Um ano inteiro sem férias termina com +10 de stress.</p><div class="btns">`;
+          Um ano inteiro sem férias termina com +10 de stress.</p><div class="btns">`,
+          `<section class="card"><h3>Vacations <small id="lz-vac"></small></h3>
+          <p class="muted">One trip per year. On vacation you don't work or study (energy stays full) and businesses without a manager are neglected.
+          A whole year without a vacation ends with +10 stress.</p><div class="btns">`);
         for (const d of LF.DESTINATIONS) {
           h += `<button data-act="vacation" data-id="${d.id}" id="b-vc-${d.id}">${lf.bucket[d.id] ? '✓ ' : ''}${d.n}
-            <small><span id="lz-vc-${d.id}"></span> · ${d.days} dias · ${d.stress} de stress${d.vis ? ` · +${d.vis} visib.` : ''}</small></button>`;
+            <small><span id="lz-vc-${d.id}"></span> · ${d.days} ${tr('dias', 'days')} · ${d.stress} ${tr('de stress', 'stress')}${d.vis ? ` · +${d.vis} visib.` : ''}</small></button>`;
         }
-        h += `</div><p class="muted">Lista de desejos: ${Object.keys(lf.bucket).length}/${LF.DESTINATIONS.length} destinos visitados.</p></section>`;
+        h += `</div><p class="muted">${tr(`Lista de desejos: ${Object.keys(lf.bucket).length}/${LF.DESTINATIONS.length} destinos visitados.`,
+          `Bucket list: ${Object.keys(lf.bucket).length}/${LF.DESTINATIONS.length} destinations visited.`)}</p></section>`;
 
         // Hobbies
-        h += `<section class="card"><h3>Hobbies <small>${Object.keys(lf.hobbies).length}/${LF.hobbySlots(S)} vagas</small></h3>
-          <p class="muted">Custam energia todo dia e uma mensalidade. Sem energia, o efeito do mês cai na proporção dos dias perdidos.</p><table class="tbl">`;
+        h += `<section class="card"><h3>Hobbies <small>${Object.keys(lf.hobbies).length}/${LF.hobbySlots(S)} ${tr('vagas', 'slots')}</small></h3>
+          <p class="muted">${tr('Custam energia todo dia e uma mensalidade. Sem energia, o efeito do mês cai na proporção dos dias perdidos.',
+            'They cost energy every day plus a monthly fee. Without energy, the month\'s effect drops in proportion to the days missed.')}</p><table class="tbl">`;
         for (const [id, x] of Object.entries(LF.HOBBIES)) {
           const on = !!lf.hobbies[id];
-          h += `<tr><td><b>${x.n}</b><br><small class="muted">${x.d}</small></td><td><small>${x.energy} energia/dia · <span id="lz-hc-${id}"></span>/mês</small></td>
-            <td>${on ? `<button data-act="hobby-stop" data-id="${id}">Parar</button>` : `<button data-act="hobby-start" data-id="${id}" id="b-hb-${id}">Começar</button>`}</td></tr>`;
+          h += `<tr><td><b>${x.n}</b><br><small class="muted">${x.d}</small></td><td><small>${x.energy} ${tr('energia/dia', 'energy/day')} · <span id="lz-hc-${id}"></span>/${tr('mês', 'month')}</small></td>
+            <td>${on ? `<button data-act="hobby-stop" data-id="${id}">${tr('Parar', 'Stop')}</button>` : `<button data-act="hobby-start" data-id="${id}" id="b-hb-${id}">${tr('Começar', 'Start')}</button>`}</td></tr>`;
         }
         h += '</table></section>';
 
         // Saúde e pet
-        h += '<section class="card"><h3>Saúde</h3><p class="muted">Plano de saúde reduz o custo de imprevistos médicos. O premium inclui check-ups: +2 anos de vida e o aviso do médico chega antes.</p><div class="btns">';
+        h += tr('<section class="card"><h3>Saúde</h3><p class="muted">Plano de saúde reduz o custo de imprevistos médicos. O premium inclui check-ups: +2 anos de vida e o aviso do médico chega antes.</p><div class="btns">',
+          '<section class="card"><h3>Health</h3><p class="muted">Health insurance lowers the cost of medical emergencies. Premium includes check-ups: +2 years of life and the doctor\'s warning comes earlier.</p><div class="btns">');
         for (const [id, x] of Object.entries(LF.PLANS)) {
           h += `<button data-act="plan" data-id="${id}" class="${lf.health === id ? 'active' : ''}">${lf.health === id ? '✓ ' : ''}${x.n}
-            <small>${x.cost ? `<span id="lz-pl-${id}"></span>/mês · ` : ''}imprevistos ×${String(x.med).replace('.', ',')}</small></button>`;
+            <small>${x.cost ? `<span id="lz-pl-${id}"></span>/${tr('mês', 'month')} · ` : ''}${tr('imprevistos', 'emergencies')} ×${G.EN ? x.med : String(x.med).replace('.', ',')}</small></button>`;
         }
-        h += `</div><p class="muted">Depois dos 45, a energia máxima cai 1 por ano (metade com exercício ou corrida): hoje <b id="lz-age"></b>.</p></section>`;
+        h += tr(`</div><p class="muted">Depois dos 45, a energia máxima cai 1 por ano (metade com exercício ou corrida): hoje <b id="lz-age"></b>.</p></section>`,
+          `</div><p class="muted">After 45, max energy drops 1 per year (half with exercise or running): currently <b id="lz-age"></b>.</p></section>`);
         h += '<section class="card"><h3>Pet</h3>';
         h += lf.pet
-          ? `<p>${esc(lf.pet.name)}, seu cachorro, está com você há <span id="lz-pet"></span>. −3 de stress por mês, +bem-estar, 1 de energia/dia e <span id="lz-petc"></span>/mês.</p>`
-          : '<p class="muted">Um cachorro reduz o stress e aumenta o bem-estar. Vive de 10 a 15 anos.</p><button data-act="adopt" id="b-adopt">Adotar <small id="lz-adopt"></small></button>';
+          ? tr(`<p>${esc(lf.pet.name)}, seu cachorro, está com você há <span id="lz-pet"></span>. −3 de stress por mês, +bem-estar, 1 de energia/dia e <span id="lz-petc"></span>/mês.</p>`,
+            `<p>${esc(lf.pet.name)}, your dog, has been with you for <span id="lz-pet"></span>. −3 stress per month, +well-being, 1 energy/day and <span id="lz-petc"></span>/month.</p>`)
+          : tr('<p class="muted">Um cachorro reduz o stress e aumenta o bem-estar. Vive de 10 a 15 anos.</p><button data-act="adopt" id="b-adopt">Adotar <small id="lz-adopt"></small></button>',
+            '<p class="muted">A dog lowers stress and raises well-being. Lives 10 to 15 years.</p><button data-act="adopt" id="b-adopt">Adopt <small id="lz-adopt"></small></button>');
         h += '</section>';
 
         // Segunda casa
-        h += `<section class="card"><h3>Segunda casa</h3><p class="muted">−3 de stress por mês e +bem-estar; manutenção de 0,1% do valor ao mês.
-          Com a casa de praia, as férias na praia saem de graça. Segue o índice imobiliário e entra no patrimônio.</p><table class="tbl">`;
+        h += tr(`<section class="card"><h3>Segunda casa</h3><p class="muted">−3 de stress por mês e +bem-estar; manutenção de 0,1% do valor ao mês.
+          Com a casa de praia, as férias na praia saem de graça. Segue o índice imobiliário e entra no patrimônio.</p><table class="tbl">`,
+          `<section class="card"><h3>Second home</h3><p class="muted">−3 stress per month and +well-being; upkeep of 0.1% of the value per month.
+          With the beach house, beach vacations are free. Follows the real estate index and counts toward net worth.</p><table class="tbl">`);
         for (const x of LF.SECOND) {
           const i = lf.second.findIndex(y => y.id === x.id), own = lf.second[i];
-          h += `<tr><td><b>${x.n}</b></td><td id="lz-2v-${x.id}"></td><td>${own ? (own.selling ? '<small class="muted">à venda</small>'
-            : `<button data-act="second-sell" data-i="${i}">Vender</button>`) : `<button data-act="second-buy" data-id="${x.id}" id="b-2b-${x.id}">Comprar <small id="lz-2c-${x.id}"></small></button>`}</td></tr>`;
+          h += `<tr><td><b>${x.n}</b></td><td id="lz-2v-${x.id}"></td><td>${own ? (own.selling ? `<small class="muted">${tr('à venda', 'for sale')}</small>`
+            : `<button data-act="second-sell" data-i="${i}">${tr('Vender', 'Sell')}</button>`) : `<button data-act="second-buy" data-id="${x.id}" id="b-2b-${x.id}">${tr('Comprar', 'Buy')} <small id="lz-2c-${x.id}"></small></button>`}</td></tr>`;
         }
         h += '</table></section>';
 
         // Coleções
-        h += `<section class="card"><h3>Coleções</h3><p class="muted">Peças valorizam (ou não) com o tempo e dão visibilidade e prestígio na compra. Vender é por leilão:
-          de 1 a 4 meses, 10% de comissão e 15% de IR sobre o ganho.</p><table class="tbl">`;
+        h += tr(`<section class="card"><h3>Coleções</h3><p class="muted">Peças valorizam (ou não) com o tempo e dão visibilidade e prestígio na compra. Vender é por leilão:
+          de 1 a 4 meses, 10% de comissão e 15% de IR sobre o ganho.</p><table class="tbl">`,
+          `<section class="card"><h3>Collections</h3><p class="muted">Pieces appreciate (or not) over time and give visibility and prestige when bought. Selling is by auction:
+          1 to 4 months, 10% commission and 15% income tax on the gain.</p><table class="tbl">`);
         for (const [kind, c] of Object.entries(LF.COLLECTIONS)) {
           h += `<tr><td><b>${c.n}</b><br><small id="lz-cx-${kind}"></small></td><td class="ops">${LF.LOTS.map((l, i) =>
             `<button data-act="col-buy" data-id="${kind}" data-i="${i}" id="b-cb-${kind}-${i}">${c.lots[i]} <small id="lz-cc-${kind}-${i}"></small></button>`).join('')}</td></tr>`;
@@ -897,7 +1003,7 @@
           h += '<table class="tbl">';
           lf.collections.forEach((x, i) => {
             h += `<tr><td>${LF.COLLECTIONS[x.kind].lots[x.lot]}</td><td><b id="lz-cv-${i}"></b> <small id="lz-cp-${i}"></small></td>
-              <td>${x.selling ? `<small class="muted" id="lz-cs-${i}"></small>` : `<button data-act="col-sell" data-i="${i}">Leiloar</button>`}</td></tr>`;
+              <td>${x.selling ? `<small class="muted" id="lz-cs-${i}"></small>` : `<button data-act="col-sell" data-i="${i}">${tr('Leiloar', 'Auction')}</button>`}</td></tr>`;
           });
           h += '</table>';
         }
@@ -909,26 +1015,27 @@
         set('lz-well', f.num(lf.well, 0));
         set('lz-avg', lf.wellN ? f.num(LF.avgWell(S), 0) : '—');
         set('lz-stress', f.num(S.social.stress, 0));
-        set('lz-away', lf.away > 0 ? `De férias: mais ${lf.away} dia(s)` : '');
+        set('lz-away', lf.away > 0 ? tr(`De férias: mais ${lf.away} dia(s)`, `On vacation: ${lf.away} more day(s)`) : '');
         const year = G.cal.of(S.day).year;
-        set('lz-vac', lf.vacYear === year ? `feitas este ano${lf.lastDest ? ': ' + lf.lastDest : ''}` : 'ainda não tirou este ano');
+        set('lz-vac', lf.vacYear === year ? `${tr('feitas este ano', 'taken this year')}${lf.lastDest ? ': ' + LF.destName(lf.lastDest) : ''}` : tr('ainda não tirou este ano', 'not taken yet this year'));
         for (const d of LF.DESTINATIONS) {
           const c = LF.vacationCost(S, d);
-          set(`lz-vc-${d.id}`, c ? f.money(c) : 'grátis');
+          set(`lz-vc-${d.id}`, c ? f.money(c) : tr('grátis', 'free'));
           dis(`b-vc-${d.id}`, !LF.canVacation(S, d));
-          why(`b-vc-${d.id}`, lf.vacYear === year ? 'você já tirou férias este ano' : LF.away(S) ? 'você já está de férias' : need(S, { cash: c }));
+          why(`b-vc-${d.id}`, lf.vacYear === year ? tr('você já tirou férias este ano', 'you already took a vacation this year')
+            : LF.away(S) ? tr('você já está de férias', 'you are already on vacation') : need(S, { cash: c }));
         }
         const full = Object.keys(lf.hobbies).length >= LF.hobbySlots(S);
         for (const [id, x] of Object.entries(LF.HOBBIES)) {
           set(`lz-hc-${id}`, f.money(x.cost * pi));
           dis(`b-hb-${id}`, full);
-          why(`b-hb-${id}`, full ? 'sem vaga para outro hobby' : '');
+          why(`b-hb-${id}`, full ? tr('sem vaga para outro hobby', 'no slot for another hobby') : '');
         }
         for (const [id, x] of Object.entries(LF.PLANS)) if (x.cost) set(`lz-pl-${id}`, f.money(x.cost * pi));
-        set('lz-age', LF.ageDrain(S) ? `−${LF.ageDrain(S)}` : 'sem perda');
+        set('lz-age', LF.ageDrain(S) ? `−${LF.ageDrain(S)}` : tr('sem perda', 'no loss'));
         if (lf.pet) {
           const y = (S.day - lf.pet.born) / 360;
-          set('lz-pet', y < 1 ? `${Math.floor(S.day - lf.pet.born)} dias` : `${f.num(y, 1)} anos`);
+          set('lz-pet', y < 1 ? `${Math.floor(S.day - lf.pet.born)} ${tr('dias', 'days')}` : `${f.num(y, 1)} ${tr('anos', 'years')}`);
           set('lz-petc', f.money(400 * pi));
         } else {
           set('lz-adopt', f.money(2000 * pi));
@@ -937,14 +1044,14 @@
         }
         for (const x of LF.SECOND) {
           const own = lf.second.find(y => y.id === x.id), p = LF.secondPrice(S, x);
-          set(`lz-2v-${x.id}`, own ? `${f.money(LF.value(S, own))}${own.selling ? ` · ~${own.selling} dias` : ''}` : f.money(p));
+          set(`lz-2v-${x.id}`, own ? `${f.money(LF.value(S, own))}${own.selling ? ` · ~${own.selling} ${tr('dias', 'days')}` : ''}` : f.money(p));
           set(`lz-2c-${x.id}`, f.money(p * 1.03));
           dis(`b-2b-${x.id}`, S.cash < p * 1.03);
           why(`b-2b-${x.id}`, need(S, { cash: p * 1.03 }));
         }
         for (const [kind, c] of Object.entries(LF.COLLECTIONS)) {
           const h = S.market.hist[c.asset], r12 = h[h.length - 1] / h[Math.max(0, h.length - 361)] - 1;
-          set(`lz-cx-${kind}`, `mercado ${f.signedPct(r12, 1)} em 12 meses`);
+          set(`lz-cx-${kind}`, tr(`mercado ${f.signedPct(r12, 1)} em 12 meses`, `market ${f.signedPct(r12, 1)} over 12 months`));
           LF.LOTS.forEach((l, i) => {
             const cost = LF.lotCost(S, i);
             set(`lz-cc-${kind}-${i}`, f.money(cost));
@@ -957,10 +1064,10 @@
           set(`lz-cv-${i}`, f.money(v));
           const pl = $(`lz-cp-${i}`);
           if (pl) {
-            pl.textContent = `${f.signedPct(v / x.cost - 1, 1)} desde a compra`;
+            pl.textContent = `${f.signedPct(v / x.cost - 1, 1)} ${tr('desde a compra', 'since purchase')}`;
             pl.className = v >= x.cost ? 'good' : 'bad';
           }
-          set(`lz-cs-${i}`, x.selling ? `em leilão: ~${x.selling} dias` : '');
+          set(`lz-cs-${i}`, x.selling ? tr(`em leilão: ~${x.selling} dias`, `at auction: ~${x.selling} days`) : '');
         });
       },
     },
@@ -975,36 +1082,46 @@
       build(S) {
         const PL = G.politics, pol = S.pol, P = G.macro.POLICIES, t = G.social.tierIdx(S);
         const opts = (sel) => Object.entries(P).map(([k, p]) => `<option value="${k}"${k === sel ? ' selected' : ''}>${p.n}</option>`).join('');
-        let h = `<section class="card summary"><span>Influência <b id="p-inf"></b></span><span>Imagem pública <b id="p-img"></b></span>
-          <span>Governo <b>${P[S.macro.policy].n}</b>${pol.access ? ' <small class="good">(você tem acesso)</small>' : ''}</span>
-          <span>Risco de escândalo <b id="p-risk"></b></span>
-          ${pol.office ? `<span>Cargo <b>${PL.office(pol.office.id).n}</b> <small id="p-office"></small></span>` : ''}</section>`;
+        let h = `<section class="card summary"><span>${tr('Influência', 'Influence')} <b id="p-inf"></b></span><span>${tr('Imagem pública', 'Public image')} <b id="p-img"></b></span>
+          <span>${tr('Governo', 'Government')} <b>${P[S.macro.policy].n}</b>${pol.access ? ` <small class="good">(${tr('você tem acesso', 'you have access')})</small>` : ''}</span>
+          <span>${tr('Risco de escândalo', 'Scandal risk')} <b id="p-risk"></b></span>
+          ${pol.office ? `<span>${tr('Cargo', 'Office')} <b>${PL.office(pol.office.id).n}</b> <small id="p-office"></small></span>` : ''}</section>`;
 
         // Eleições
-        h += `<section class="card"><h3>Eleições <small>próxima: out/${G.cal.nextElection(S.day)}</small></h3>
+        h += tr(`<section class="card"><h3>Eleições <small>próxima: out/${G.cal.nextElection(S.day)}</small></h3>
           <p class="muted">Doações aumentam a chance de uma plataforma vencer. Quem apoia o vencedor ganha influência e acesso ao governo;
           quem apoia perdedores fica malvisto. A doação oficial tem limite (10% da sua renda anual); acima disso, só por caixa 2,
           que alimenta o risco de escândalo.</p><table class="tbl">
-          <tr><td><b>Plataforma</b></td><td><b>${pol.poll ? 'Pesquisa' : 'Chance estimada'}</b></td><td><b>Suas doações</b></td></tr>`;
+          <tr><td><b>Plataforma</b></td><td><b>${pol.poll ? 'Pesquisa' : 'Chance estimada'}</b></td><td><b>Suas doações</b></td></tr>`,
+          `<section class="card"><h3>Elections <small>next: Oct/${G.cal.nextElection(S.day)}</small></h3>
+          <p class="muted">Donations raise a platform's chance of winning. Backing the winner earns influence and access to the government;
+          backing losers makes you unpopular. Official donations are capped (10% of your annual income); beyond that, only off the books,
+          which feeds the scandal risk.</p><table class="tbl">
+          <tr><td><b>Platform</b></td><td><b>${pol.poll ? 'Poll' : 'Estimated chance'}</b></td><td><b>Your donations</b></td></tr>`);
         for (const [k, p] of Object.entries(P)) {
           h += `<tr><td><b>${p.n}</b><br><small class="muted">${p.d}</small></td><td id="p-w-${k}"></td><td id="p-d-${k}"></td></tr>`;
         }
-        h += `</table><p>Doar <input id="p-don-in" inputmode="decimal" placeholder="valor em R$"> para <select id="p-don-side">${opts('moderado')}</select>
+        h += tr(`</table><p>Doar <input id="p-don-in" inputmode="decimal" placeholder="valor em R$"> para <select id="p-don-side">${opts('moderado')}</select>
           <button data-act="pol-donate" data-id="legal">Doação oficial</button> <button data-act="pol-donate" data-id="dirty">Caixa 2</button>
-          <span class="muted">limite oficial restante: <span id="p-limit"></span></span></p></section>`;
+          <span class="muted">limite oficial restante: <span id="p-limit"></span></span></p></section>`,
+          `</table><p>Donate <input id="p-don-in" inputmode="decimal" placeholder="amount in R$"> to <select id="p-don-side">${opts('moderado')}</select>
+          <button data-act="pol-donate" data-id="legal">Official donation</button> <button data-act="pol-donate" data-id="dirty">Off the books</button>
+          <span class="muted">official limit remaining: <span id="p-limit"></span></span></p></section>`);
 
         // Lobby
         if (S.research.relacoes_institucionais) {
-          h += `<section class="card"><h3>Lobby</h3><p class="muted">Gaste influência para empurrar projetos de lei. A tramitação leva meses; imagem ruim atrapalha
-            e vazamentos acontecem. Um governo redistributivo revoga as isenções.</p><table class="tbl">`;
+          h += tr(`<section class="card"><h3>Lobby</h3><p class="muted">Gaste influência para empurrar projetos de lei. A tramitação leva meses; imagem ruim atrapalha
+            e vazamentos acontecem. Um governo redistributivo revoga as isenções.</p><table class="tbl">`,
+            `<section class="card"><h3>Lobbying</h3><p class="muted">Spend influence to push bills through. Passage takes months; a bad image gets in the way
+            and leaks happen. A redistributive government repeals the exemptions.</p><table class="tbl">`);
           for (const b of PL.BILLS) {
             const run = pol.bills.find(x => x.id === b.id), done = pol.passed[b.id];
             h += `<tr><td><b>${b.n}</b><br><small class="muted">${b.d}</small></td><td>`;
-            if (done) h += `<span class="good">aprovado${done.sector ? ` (${G.ASSETS[done.sector].short})` : ''}</span>`;
-            else if (run) h += `<span class="muted">em tramitação: ${run.left} meses</span>`;
+            if (done) h += `<span class="good">${tr('aprovado', 'passed')}${done.sector ? ` (${G.ASSETS[done.sector].short})` : ''}</span>`;
+            else if (run) h += `<span class="muted">${tr(`em tramitação: ${run.left} meses`, `in progress: ${run.left} months`)}</span>`;
             else {
               h += b.sector ? `<select id="p-sec">${G.events.SECTORS.map(id => `<option value="${id}">${G.ASSETS[id].short}</option>`).join('')}</select> ` : '';
-              h += `<button data-act="lobby" data-id="${b.id}" id="b-lb-${b.id}">Fazer lobby <small id="p-lc-${b.id}"></small></button>`;
+              h += `<button data-act="lobby" data-id="${b.id}" id="b-lb-${b.id}">${tr('Fazer lobby', 'Lobby')} <small id="p-lc-${b.id}"></small></button>`;
             }
             h += '</td></tr>';
           }
@@ -1013,39 +1130,46 @@
 
         // Mídia e think tank
         if (S.research.midia || S.research.filantropia_estrategica) {
-          h += '<section class="card"><h3>Mídia e ideias</h3>';
+          h += `<section class="card"><h3>${tr('Mídia e ideias', 'Media and ideas')}</h3>`;
           if (S.research.midia) {
             h += '<table class="tbl">';
             for (const m of PL.MEDIA) {
-              h += `<tr><td><b>${m.n}</b><br><small class="muted">+${m.inf} influência e +${m.img} imagem por mês; manutenção de 0,3% do valor ao mês.</small></td>
-                <td>${pol.media[m.id] ? '<span class="good">seu</span>' : `<button data-act="media" data-id="${m.id}" id="b-md-${m.id}">Comprar <small id="p-mc-${m.id}"></small></button>`}</td></tr>`;
+              h += `<tr><td><b>${m.n}</b><br><small class="muted">${tr(`+${m.inf} influência e +${m.img} imagem por mês; manutenção de 0,3% do valor ao mês.`,
+                `+${m.inf} influence and +${m.img} image per month; upkeep of 0.3% of the value per month.`)}</small></td>
+                <td>${pol.media[m.id] ? `<span class="good">${tr('seu', 'yours')}</span>` : `<button data-act="media" data-id="${m.id}" id="b-md-${m.id}">${tr('Comprar', 'Buy')} <small id="p-mc-${m.id}"></small></button>`}</td></tr>`;
             }
             h += '</table>';
           }
           if (S.research.filantropia_estrategica) {
             h += pol.thinkTank
-              ? `<p>Seu think tank defende a plataforma <b>${P[pol.thinkTank.side].n}</b> há ${pol.thinkTank.years} ano(s): +2 de influência por mês e mais chance para ela nas eleições.
-                 <button data-act="tt-stop">Fechar</button></p>`
-              : `<p>Fundar um think tank (R$ 250 mil/mês) para defender <select id="p-tt-side">${opts('austero')}</select> <button data-act="tt-start">Fundar</button></p>`;
+              ? tr(`<p>Seu think tank defende a plataforma <b>${P[pol.thinkTank.side].n}</b> há ${pol.thinkTank.years} ano(s): +2 de influência por mês e mais chance para ela nas eleições.
+                 <button data-act="tt-stop">Fechar</button></p>`,
+                `<p>Your think tank has championed the <b>${P[pol.thinkTank.side].n}</b> platform for ${pol.thinkTank.years} year(s): +2 influence per month and better odds for it in elections.
+                 <button data-act="tt-stop">Close</button></p>`)
+              : tr(`<p>Fundar um think tank (R$ 250 mil/mês) para defender <select id="p-tt-side">${opts('austero')}</select> <button data-act="tt-start">Fundar</button></p>`,
+                `<p>Found a think tank (R$ 250k/month) to champion <select id="p-tt-side">${opts('austero')}</select> <button data-act="tt-start">Found</button></p>`);
           }
           h += '</section>';
         }
 
         // Entidades e cargos
-        h += '<section class="card"><h3>Entidades e cargos</h3><table class="tbl">';
+        h += `<section class="card"><h3>${tr('Entidades e cargos', 'Associations and offices')}</h3><table class="tbl">`;
         for (const e of PL.ENTITIES) {
-          h += `<tr><td><b>${e.n}</b><br><small class="muted">${e.d}</small></td><td>${G.fmt.money(e.fee * S.macro.priceIndex)}/mês</td><td>${
-            pol.entities[e.id] ? `<button data-act="ent-leave" data-id="${e.id}">Sair</button>`
-            : t < e.tier ? `<small class="muted">requer ${G.social.TIERS[e.tier][1]}</small>` : `<button data-act="ent-join" data-id="${e.id}">Entrar</button>`}</td></tr>`;
+          h += `<tr><td><b>${e.n}</b><br><small class="muted">${e.d}</small></td><td>${G.fmt.money(e.fee * S.macro.priceIndex)}/${tr('mês', 'month')}</td><td>${
+            pol.entities[e.id] ? `<button data-act="ent-leave" data-id="${e.id}">${tr('Sair', 'Leave')}</button>`
+            : t < e.tier ? `<small class="muted">${tr('requer', 'requires')} ${G.social.TIERS[e.tier][1]}</small>` : `<button data-act="ent-join" data-id="${e.id}">${tr('Entrar', 'Join')}</button>`}</td></tr>`;
         }
         for (const o of PL.OFFICES) {
           if (o.req && !S.research[o.req]) continue;
-          h += `<tr><td><b>${o.n}</b><br><small class="muted">${o.d} Requer ${o.inf} de influência e posição ${G.social.TIERS[o.tier][1]}.</small></td><td></td><td>`;
-          if (pol.office && pol.office.id === o.id) h += '<span class="good">no cargo</span>';
+          h += `<tr><td><b>${o.n}</b><br><small class="muted">${o.d} ${tr(`Requer ${o.inf} de influência e posição ${G.social.TIERS[o.tier][1]}.`,
+            `Requires ${o.inf} influence and ${G.social.TIERS[o.tier][1]} status.`)}</small></td><td></td><td>`;
+          if (pol.office && pol.office.id === o.id) h += `<span class="good">${tr('no cargo', 'in office')}</span>`;
           else if (o.id === 'bc') {
-            h += `<select id="p-bc"><option value="dovish">Juros baixos (inflação sobe)</option><option value="neutro">Neutro</option>
-              <option value="hawkish">Juros altos (inflação cai)</option></select> <button data-act="office" data-id="bc" id="b-of-bc">Assumir</button>`;
-          } else h += `<button data-act="office" data-id="${o.id}" id="b-of-${o.id}">Assumir</button>`;
+            h += tr(`<select id="p-bc"><option value="dovish">Juros baixos (inflação sobe)</option><option value="neutro">Neutro</option>
+              <option value="hawkish">Juros altos (inflação cai)</option></select> <button data-act="office" data-id="bc" id="b-of-bc">Assumir</button>`,
+              `<select id="p-bc"><option value="dovish">Low rates (inflation rises)</option><option value="neutro">Neutral</option>
+              <option value="hawkish">High rates (inflation falls)</option></select> <button data-act="office" data-id="bc" id="b-of-bc">Take office</button>`);
+          } else h += `<button data-act="office" data-id="${o.id}" id="b-of-${o.id}">${tr('Assumir', 'Take office')}</button>`;
           h += '</td></tr>';
         }
         h += '</table></section>';
@@ -1058,19 +1182,20 @@
         img.textContent = f.num(pol.image, 0);
         img.className = pol.image < -20 ? 'bad' : pol.image > 20 ? 'good' : '';
         const r = PL.scandalChance(S);
-        set('p-risk', r < 0.005 ? 'baixo' : r < 0.03 ? 'médio' : 'alto');
-        if (pol.office) set('p-office', `até ${f.monthYear(pol.office.until)}`);
+        set('p-risk', r < 0.005 ? tr('baixo', 'low') : r < 0.03 ? tr('médio', 'medium') : tr('alto', 'high'));
+        if (pol.office) set('p-office', `${tr('até', 'until')} ${f.monthYear(pol.office.until)}`);
         const w = pol.poll || PL.weights(S);
         for (const k in G.macro.POLICIES) {
           set(`p-w-${k}`, f.pct(w[k], 0));
           const b = pol.backed[k];
-          set(`p-d-${k}`, b ? f.money(b.legal) + (b.dirty ? ` + ${f.money(b.dirty)} por fora` : '') : '');
+          set(`p-d-${k}`, b ? f.money(b.legal) + (b.dirty ? ` + ${f.money(b.dirty)} ${tr('por fora', 'off the books')}` : '') : '');
         }
         set('p-limit', f.money(PL.legalLimit(S)));
         for (const b of PL.BILLS) {
-          set(`p-lc-${b.id}`, `${f.num(PL.lobbyCost(S, b), 0)} influência`);
+          set(`p-lc-${b.id}`, `${f.num(PL.lobbyCost(S, b), 0)} ${tr('influência', 'influence')}`);
           dis(`b-lb-${b.id}`, pol.influence < PL.lobbyCost(S, b));
-          why(`b-lb-${b.id}`, pol.influence < PL.lobbyCost(S, b) ? `faltam ${f.num(PL.lobbyCost(S, b) - pol.influence, 0)} de influência` : '');
+          why(`b-lb-${b.id}`, pol.influence < PL.lobbyCost(S, b) ? tr(`faltam ${f.num(PL.lobbyCost(S, b) - pol.influence, 0)} de influência`,
+            `${f.num(PL.lobbyCost(S, b) - pol.influence, 0)} influence short`) : '');
         }
         for (const m of PL.MEDIA) {
           set(`p-mc-${m.id}`, f.money(m.cost * S.macro.priceIndex));
@@ -1079,10 +1204,10 @@
         }
         for (const o of PL.OFFICES) {
           dis(`b-of-${o.id}`, !PL.canTakeOffice(S, o));
-          why(`b-of-${o.id}`, PL.canTakeOffice(S, o) ? '' : pol.office ? 'você já ocupa um cargo'
-            : pol.influence < o.inf ? `faltam ${f.num(o.inf - pol.influence, 0)} de influência`
-            : G.social.tierIdx(S) < o.tier ? `requer posição ${G.social.TIERS[o.tier][1]}`
-            : o.access && !pol.access ? 'precisa ter apoiado o governo eleito' : '');
+          why(`b-of-${o.id}`, PL.canTakeOffice(S, o) ? '' : pol.office ? tr('você já ocupa um cargo', 'you already hold an office')
+            : pol.influence < o.inf ? tr(`faltam ${f.num(o.inf - pol.influence, 0)} de influência`, `${f.num(o.inf - pol.influence, 0)} influence short`)
+            : G.social.tierIdx(S) < o.tier ? tr(`requer posição ${G.social.TIERS[o.tier][1]}`, `requires ${G.social.TIERS[o.tier][1]} status`)
+            : o.access && !pol.access ? tr('precisa ter apoiado o governo eleito', 'you must have backed the elected government') : '');
         }
       },
     },
@@ -1094,25 +1219,34 @@
       },
       build(S) {
         const LG = G.legacy, L = S.legacy;
-        let h = `<section class="card summary"><span>Geração <b>${L.generation}</b></span><span>Idade <b id="l-age"></b></span>
+        let h = tr(`<section class="card summary"><span>Geração <b>${L.generation}</b></span><span>Idade <b id="l-age"></b></span>
           <span>Saúde <b id="l-health"></b></span><span>Pontos de legado <b id="l-lp"></b></span></section>
           <section class="card"><h3>Sucessão</h3>
           <p>Se passasse o bastão hoje: <b id="l-gain"></b> pontos de legado
           <span class="muted">(raiz do patrimônio real + prestígio + bem-estar da vida; sem filhos, a fortuna vai para uma fundação e metade se perde)</span>.</p>
           <p>Bem-estar médio desta vida: <b id="l-well"></b> <span class="muted">(acima de 40, cada ponto rende legado; hoje vale <span id="l-wellpts"></span> pontos)</span></p>
           <p>Seu herdeiro receberia <b id="l-heir"></b> <span class="muted">(${G.fmt.pct(LG.heirShare(S), 0)} do patrimônio, menos 8% de ITCMD)</span>
-          e recomeçaria como estagiário, no mesmo mundo e no mesmo ano.</p>`;
-        if (S.social.family.kids === 0) h += '<p class="bad">Você ainda não tem filhos (aba Vida → Família).</p>';
+          e recomeçaria como estagiário, no mesmo mundo e no mesmo ano.</p>`,
+          `<section class="card summary"><span>Generation <b>${L.generation}</b></span><span>Age <b id="l-age"></b></span>
+          <span>Health <b id="l-health"></b></span><span>Legacy points <b id="l-lp"></b></span></section>
+          <section class="card"><h3>Succession</h3>
+          <p>If you passed the torch today: <b id="l-gain"></b> legacy points
+          <span class="muted">(square root of real net worth + prestige + lifetime well-being; without children, the fortune goes to a foundation and half is lost)</span>.</p>
+          <p>Average well-being this life: <b id="l-well"></b> <span class="muted">(above 40, each point earns legacy; currently worth <span id="l-wellpts"></span> points)</span></p>
+          <p>Your heir would receive <b id="l-heir"></b> <span class="muted">(${G.fmt.pct(LG.heirShare(S), 0)} of net worth, minus 8% inheritance tax)</span>
+          and would start over as an intern, in the same world and the same year.</p>`);
+        if (S.social.family.kids === 0) h += tr('<p class="bad">Você ainda não tem filhos (aba Vida → Família).</p>', '<p class="bad">You have no children yet (Life tab → Family).</p>');
         h += LG.age(S) >= LG.HEIR_AGE
-          ? '<button data-act="succeed">Aposentar e passar o bastão</button>'
-          : `<p class="muted">Dá para passar o bastão a partir dos ${LG.HEIR_AGE} anos. Se a saúde acabar antes, a sucessão acontece sozinha.</p>`;
-        h += '</section><section class="card"><h3>Melhorias permanentes</h3><table class="tbl">';
+          ? `<button data-act="succeed">${tr('Aposentar e passar o bastão', 'Retire and pass the torch')}</button>`
+          : `<p class="muted">${tr(`Dá para passar o bastão a partir dos ${LG.HEIR_AGE} anos. Se a saúde acabar antes, a sucessão acontece sozinha.`,
+            `You can pass the torch from age ${LG.HEIR_AGE}. If your health runs out first, succession happens on its own.`)}</p>`;
+        h += `</section><section class="card"><h3>${tr('Melhorias permanentes', 'Permanent upgrades')}</h3><table class="tbl">`;
         for (const u of LG.UPGRADES) {
           const lvl = LG.level(S, u.id), cost = LG.upgradeCost(S, u);
-          h += `<tr><td><b>${u.n}</b> <small>nível ${lvl}/${u.costs.length}</small><br><small class="muted">${u.d(lvl)}</small></td>
-            <td>${cost === undefined ? '<span class="good">máximo</span>' : `<button data-act="legacy-up" data-id="${u.id}" id="b-lu-${u.id}">Comprar <small>${cost} pontos</small></button>`}</td></tr>`;
+          h += `<tr><td><b>${u.n}</b> <small>${tr('nível', 'level')} ${lvl}/${u.costs.length}</small><br><small class="muted">${u.d(lvl)}</small></td>
+            <td>${cost === undefined ? `<span class="good">${tr('máximo', 'maxed')}</span>` : `<button data-act="legacy-up" data-id="${u.id}" id="b-lu-${u.id}">${tr('Comprar', 'Buy')} <small>${cost} ${tr('pontos', 'points')}</small></button>`}</td></tr>`;
         }
-        h += `</table></section><section class="card"><h3>Estatísticas desta vida</h3><table class="tbl stats">
+        h += tr(`</table></section><section class="card"><h3>Estatísticas desta vida</h3><table class="tbl stats">
           <tr><td>Anos vividos no jogo</td><td id="st-years"></td><td>Maior patrimônio</td><td id="st-peak"></td></tr>
           <tr><td>Salários e horas extras</td><td id="st-work"></td><td>Dividendos</td><td id="st-div"></td></tr>
           <tr><td>Aluguéis de imóveis</td><td id="st-rent"></td><td>Lucro das empresas</td><td id="st-biz"></td></tr>
@@ -1120,16 +1254,26 @@
           <tr><td>IR pago</td><td id="st-tax"></td><td>Doado</td><td id="st-don"></td></tr></table>
           <p class="muted">Valores nominais somados ao longo da vida. <button class="link" data-act="hints-on">Religar dicas do tutorial</button></p>
           <p><label class="check"><input type="checkbox" data-act="retro-toggle" id="l-retro"> Mostrar a retrospectiva de cada ano (em janeiro)</label></p></section>
-          <section class="card"><h3>Conquistas <small>${Object.keys(L.ach).length}/${LG.ACHIEVEMENTS.length} · +3 pontos cada</small></h3><table class="tbl">`;
+          <section class="card"><h3>Conquistas <small>${Object.keys(L.ach).length}/${LG.ACHIEVEMENTS.length} · +3 pontos cada</small></h3><table class="tbl">`,
+          `</table></section><section class="card"><h3>Stats for this life</h3><table class="tbl stats">
+          <tr><td>Years lived in the game</td><td id="st-years"></td><td>Peak net worth</td><td id="st-peak"></td></tr>
+          <tr><td>Salaries and overtime</td><td id="st-work"></td><td>Dividends</td><td id="st-div"></td></tr>
+          <tr><td>Property rents</td><td id="st-rent"></td><td>Business profit</td><td id="st-biz"></td></tr>
+          <tr><td>Asset manager profit</td><td id="st-fund"></td><td>Startup returns</td><td id="st-angel"></td></tr>
+          <tr><td>Income tax paid</td><td id="st-tax"></td><td>Donated</td><td id="st-don"></td></tr></table>
+          <p class="muted">Nominal amounts summed over the lifetime. <button class="link" data-act="hints-on">Turn tutorial tips back on</button></p>
+          <p><label class="check"><input type="checkbox" data-act="retro-toggle" id="l-retro"> Show each year's review (in January)</label></p></section>
+          <section class="card"><h3>Achievements <small>${Object.keys(L.ach).length}/${LG.ACHIEVEMENTS.length} · +3 points each</small></h3><table class="tbl">`);
         for (const a of LG.ACHIEVEMENTS) {
           const got = L.ach[a.id] !== undefined;
           h += `<tr><td>${got ? `<b class="good">✓ ${a.n}</b>` : `<span class="muted">${a.n}</span>`}</td><td class="muted">${a.d}</td></tr>`;
         }
         h += '</table></section>';
         if (L.history.length) {
-          h += '<section class="card"><h3>Dinastia</h3><table class="tbl"><tr><td><b>Geração</b></td><td><b>Anos</b></td><td><b>Patrimônio final (R$ de 2026)</b></td><td><b>Pontos</b></td></tr>';
+          h += tr('<section class="card"><h3>Dinastia</h3><table class="tbl"><tr><td><b>Geração</b></td><td><b>Anos</b></td><td><b>Patrimônio final (R$ de 2026)</b></td><td><b>Pontos</b></td></tr>',
+            '<section class="card"><h3>Dynasty</h3><table class="tbl"><tr><td><b>Generation</b></td><td><b>Years</b></td><td><b>Final net worth (2026 R$)</b></td><td><b>Points</b></td></tr>');
           for (const g of L.history) {
-            h += `<tr><td>${g.gen}ª</td><td>${g.from}–${g.to} (${g.reason === 'morte' ? `morreu aos ${g.age}` : `aposentou aos ${g.age}`})</td><td>${f.money(g.nw)}</td><td>+${g.lp}</td></tr>`;
+            h += `<tr><td>${tr(`${g.gen}ª`, `#${g.gen}`)}</td><td>${g.from}–${g.to} (${g.reason === 'morte' ? tr(`morreu aos ${g.age}`, `died at ${g.age}`) : tr(`aposentou aos ${g.age}`, `retired at ${g.age}`)})</td><td>${f.money(g.nw)}</td><td>+${g.lp}</td></tr>`;
           }
           h += '</table></section>';
         }
@@ -1137,7 +1281,7 @@
       },
       update(S) {
         const LG = G.legacy;
-        set('l-age', `${Math.floor(LG.age(S))} anos`);
+        set('l-age', `${Math.floor(LG.age(S))} ${tr('anos', 'years')}`);
         set('l-health', LG.health(S));
         set('l-lp', f.num(S.legacy.lp));
         set('l-gain', f.num(LG.points(S)));
@@ -1159,7 +1303,7 @@
         for (const u of LG.UPGRADES) {
           const cost = LG.upgradeCost(S, u);
           dis(`b-lu-${u.id}`, cost === undefined || S.legacy.lp < cost);
-          why(`b-lu-${u.id}`, cost !== undefined && S.legacy.lp < cost ? `faltam ${cost - S.legacy.lp} pontos de legado` : '');
+          why(`b-lu-${u.id}`, cost !== undefined && S.legacy.lp < cost ? tr(`faltam ${cost - S.legacy.lp} pontos de legado`, `${cost - S.legacy.lp} legacy points short`) : '');
         }
       },
     },
@@ -1171,38 +1315,54 @@
         const B = G.business;
         let h = '';
         if (S.research.empreendedorismo) {
-          h += `<section class="card summary"><span>Lucro das empresas <b id="bz-profit"></b>/mês</span>
+          h += tr(`<section class="card summary"><span>Lucro das empresas <b id="bz-profit"></b>/mês</span>
             <span>Valor das empresas <b id="bz-value"></b></span><span>Dívida <b id="bz-debt"></b> · parcelas <b id="bz-pmt"></b>/mês</span>
             <span>Consumo de energia <b id="bz-drain"></b>/dia</span></section>
             <section class="card"><h3>Empresas</h3>
             <p class="muted">Cada unidade sem gerente consome energia todo dia; sem energia, o negócio fica largado e lucra menos.
             Lucro paga 15% de imposto. Vender uma unidade rende 90% do preço de uma nova hoje: 75% no fundo da recessão, até 115% no pico.
             <b>Financiar</b>: 30% de entrada e 70% em 10 anos a <span id="bz-rate"></span> (pós-fixado: a parcela sobe com a Selic).
-            <span id="bz-bndes"></span></p><table class="tbl">`;
+            <span id="bz-bndes"></span></p><table class="tbl">`,
+            `<section class="card summary"><span>Business profit <b id="bz-profit"></b>/month</span>
+            <span>Business value <b id="bz-value"></b></span><span>Debt <b id="bz-debt"></b> · payments <b id="bz-pmt"></b>/month</span>
+            <span>Energy drain <b id="bz-drain"></b>/day</span></section>
+            <section class="card"><h3>Businesses</h3>
+            <p class="muted">Each unit without a manager drains energy every day; without energy, the business is neglected and earns less.
+            Profit pays 15% tax. Selling a unit yields 90% of the price of a new one today: 75% at the bottom of a recession, up to 115% at the peak.
+            <b>Finance</b>: 30% down and 70% over 10 years at <span id="bz-rate"></span> (floating: the payment rises with the Selic).
+            <span id="bz-bndes"></span></p><table class="tbl">`);
           for (const b of G.BUSINESSES) {
             if ((b.tier || 0) > G.social.tierIdx(S) + 1) continue;
-            h += `<tr><td><b>${b.n}</b>${b.tier ? ` <small class="muted">requer ${G.social.TIERS[b.tier][1]}</small>` : ''}<br><small class="muted">energia ${b.energy}/dia sem gerente${b.beta >= 1 ? ' · sofre na recessão' : b.beta <= 0.5 ? ' · defensivo' : ''}</small></td>
-              <td>unidades <b id="bz-n-${b.id}"></b><br><small class="muted" id="bz-m-${b.id}"></small></td>
-              <td><span id="bz-u-${b.id}"></span>/mês cada</td>
-              <td class="ops"><button data-act="biz-open" data-id="${b.id}" id="b-bo-${b.id}">Abrir <small id="bz-p-${b.id}"></small></button>
-              <button data-act="biz-fin" data-id="${b.id}" id="b-bf-${b.id}">Financiar <small id="bz-f-${b.id}"></small></button>
-              ${S.research.gestao_pessoas ? `<button data-act="biz-hire" data-id="${b.id}" id="b-bh-${b.id}">Contratar gerente</button>` : ''}
-              <button data-act="biz-sell" data-id="${b.id}" id="b-bs-${b.id}">Vender uma <small id="bz-s-${b.id}"></small></button></td></tr>`;
+            h += `<tr><td><b>${b.n}</b>${b.tier ? ` <small class="muted">${tr('requer', 'requires')} ${G.social.TIERS[b.tier][1]}</small>` : ''}<br><small class="muted">${tr(`energia ${b.energy}/dia sem gerente`, `${b.energy} energy/day without a manager`)}${b.beta >= 1 ? tr(' · sofre na recessão', ' · suffers in recessions') : b.beta <= 0.5 ? tr(' · defensivo', ' · defensive') : ''}</small></td>
+              <td>${tr('unidades', 'units')} <b id="bz-n-${b.id}"></b><br><small class="muted" id="bz-m-${b.id}"></small></td>
+              <td><span id="bz-u-${b.id}"></span>${tr('/mês cada', '/month each')}</td>
+              <td class="ops"><button data-act="biz-open" data-id="${b.id}" id="b-bo-${b.id}">${tr('Abrir', 'Open')} <small id="bz-p-${b.id}"></small></button>
+              <button data-act="biz-fin" data-id="${b.id}" id="b-bf-${b.id}">${tr('Financiar', 'Finance')} <small id="bz-f-${b.id}"></small></button>
+              ${S.research.gestao_pessoas ? `<button data-act="biz-hire" data-id="${b.id}" id="b-bh-${b.id}">${tr('Contratar gerente', 'Hire a manager')}</button>` : ''}
+              <button data-act="biz-sell" data-id="${b.id}" id="b-bs-${b.id}">${tr('Vender uma', 'Sell one')} <small id="bz-s-${b.id}"></small></button></td></tr>`;
           }
           h += '</table></section>';
         }
         if (S.research.gestora) {
-          h += '<section class="card"><h3>Gestora</h3>';
+          h += `<section class="card"><h3>${tr('Gestora', 'Asset manager')}</h3>`;
           if (!S.fund) {
-            h += `<p class="muted">O fundo replica sua estratégia automática (ou sua carteira atual, se não houver alvos).
+            h += tr(`<p class="muted">O fundo replica sua estratégia automática (ou sua carteira atual, se não houver alvos).
               Amigos, família e ex-colegas trazem o capital inicial conforme sua reputação.</p>
-              <button data-act="fund-open" id="b-fd-open">Abrir a gestora</button> <small class="muted" id="fd-block"></small>`;
+              <button data-act="fund-open" id="b-fd-open">Abrir a gestora</button> <small class="muted" id="fd-block"></small>`,
+              `<p class="muted">The fund replicates your automatic strategy (or your current portfolio, if there are no targets).
+              Friends, family and former colleagues bring the seed capital according to your reputation.</p>
+              <button data-act="fund-open" id="b-fd-open">Open the asset manager</button> <small class="muted" id="fd-block"></small>`);
           } else {
-            h += `<p>Patrimônio sob gestão: <b id="fd-aum"></b> · cota em 12 meses <b id="fd-r12"></b> vs CDI <b id="fd-cdi"></b></p>
+            h += tr(`<p>Patrimônio sob gestão: <b id="fd-aum"></b> · cota em 12 meses <b id="fd-r12"></b> vs CDI <b id="fd-cdi"></b></p>
               <p>Lucro da gestora no mês: <b id="fd-profit"></b> · captação líquida: <b id="fd-flow"></b></p>
               <p class="muted">2% ao ano de administração + 20% do que passar do CDI. Bater o CDI traz dinheiro novo; perder dele por 12 meses traz resgates.</p>
               <p>Valor da gestora: <b id="fd-value"></b> <span class="muted">(~3% do patrimônio sob gestão; preço cheio com 2 anos de histórico)</span></p>
-              <button data-act="fund-sell">Vender a gestora <small id="fd-sale"></small></button>`;
+              <button data-act="fund-sell">Vender a gestora <small id="fd-sale"></small></button>`,
+              `<p>Assets under management: <b id="fd-aum"></b> · fund return over 12 months <b id="fd-r12"></b> vs CDI <b id="fd-cdi"></b></p>
+              <p>Asset manager profit this month: <b id="fd-profit"></b> · net inflows: <b id="fd-flow"></b></p>
+              <p class="muted">2% annual management fee + 20% of returns above CDI. Beating CDI brings in new money; trailing it for 12 months brings redemptions.</p>
+              <p>Asset manager value: <b id="fd-value"></b> <span class="muted">(~3% of assets under management; full price with a 2-year track record)</span></p>
+              <button data-act="fund-sell">Sell the asset manager <small id="fd-sale"></small></button>`);
           }
           h += '</section>';
         }
@@ -1215,9 +1375,10 @@
           set('bz-value', f.money(B.value(S)));
           set('bz-debt', f.money(B.debt(S)));
           set('bz-pmt', f.money(B.monthlyPayments(S)));
-          set('bz-rate', `Selic + ${f.pct(B.spread(S), 0)} (hoje ${f.pct(B.loanRate(S), 1)} a.a.)`);
-          set('bz-bndes', B.bndes(S) ? 'Você tem acesso à linha do BNDES.'
-            : `Com ${B.BNDES_INFLUENCE} de influência (aba Poder), o BNDES empresta a Selic + 2%.`);
+          set('bz-rate', tr(`Selic + ${f.pct(B.spread(S), 0)} (hoje ${f.pct(B.loanRate(S), 1)} a.a.)`, `Selic + ${f.pct(B.spread(S), 0)} (currently ${f.pct(B.loanRate(S), 1)} p.a.)`));
+          set('bz-bndes', B.bndes(S) ? tr('Você tem acesso à linha do BNDES.', 'You have access to the BNDES development bank credit line.')
+            : tr(`Com ${B.BNDES_INFLUENCE} de influência (aba Poder), o BNDES empresta a Selic + 2%.`,
+              `With ${B.BNDES_INFLUENCE} influence (Power tab), the BNDES development bank lends at Selic + 2%.`));
           const d = B.drain(S);
           const dr = $('bz-drain');
           dr.textContent = f.num(d);
@@ -1225,14 +1386,15 @@
           for (const b of G.BUSINESSES) {
             const n = B.count(S, b.id), m = B.managers(S, b.id), p = B.price(S, b);
             set(`bz-n-${b.id}`, String(n));
-            set(`bz-m-${b.id}`, n ? `${m} com gerente` : '');
+            set(`bz-m-${b.id}`, n ? tr(`${m} com gerente`, `${m} with a manager`) : '');
             set(`bz-u-${b.id}`, f.money(B.unitProfit(S, b)));
             set(`bz-p-${b.id}`, f.money(p));
             dis(`b-bo-${b.id}`, S.cash < p || !B.allowed(S, b));
-            const tierMsg = (b.tier || 0) > G.social.tierIdx(S) ? `requer posição ${G.social.TIERS[b.tier][1]}` : !B.allowed(S, b) ? 'só existe uma' : '';
+            const tierMsg = (b.tier || 0) > G.social.tierIdx(S) ? tr(`requer posição ${G.social.TIERS[b.tier][1]}`, `requires ${G.social.TIERS[b.tier][1]} status`)
+              : !B.allowed(S, b) ? tr('só existe uma', 'there is only one') : '';
             why(`b-bo-${b.id}`, tierMsg || need(S, { cash: p }));
             const q = B.quote(S, b);
-            set(`bz-f-${b.id}`, `entrada ${f.money(q.down)} · ${f.money(q.pmt)}/mês`);
+            set(`bz-f-${b.id}`, tr(`entrada ${f.money(q.down)} · ${f.money(q.pmt)}/mês`, `${f.money(q.down)} down · ${f.money(q.pmt)}/month`));
             dis(`b-bf-${b.id}`, S.cash < q.down || !B.allowed(S, b));
             why(`b-bf-${b.id}`, tierMsg || need(S, { cash: q.down }));
             dis(`b-bh-${b.id}`, m >= n);
@@ -1254,7 +1416,7 @@
         } else if (S.research.gestora) {
           const blocked = (S.fundBlockedUntil || 0) > S.day;
           dis('b-fd-open', blocked);
-          set('fd-block', blocked ? `não concorrência até ${f.monthYear(S.fundBlockedUntil)}` : '');
+          set('fd-block', blocked ? tr(`não concorrência até ${f.monthYear(S.fundBlockedUntil)}`, `non-compete until ${f.monthYear(S.fundBlockedUntil)}`) : '');
         }
       },
     },
@@ -1264,30 +1426,35 @@
         !!S.research.gestao_pessoas].join('|'),
       build(S) {
         const A = G.agro;
-        let h = `<section class="card summary"><span>Preço da terra <b id="t-idx"></b> em 12 meses</span>
+        let h = tr(`<section class="card summary"><span>Preço da terra <b id="t-idx"></b> em 12 meses</span>
           <span>Suas terras <b id="t-eq"></b></span><span>Renda do agro até agora <b id="t-inc"></b></span>
           <span>Clima do ano <b id="t-clim"></b></span><span>Commodities <b id="t-cf"></b> da média do ano</span></section>
           <section class="card"><h3>Comprar terra</h3>
-          <p class="muted">Terra se valoriza com a inflação e um pouco mais. Na compra, 3% de ITBI; vender leva de 2 a 8 meses e paga 6% de corretagem.
+          <p class="muted">Terra se valoriza com a inflação e um pouco mais. Na compra, 3% de ITBI; vender leva de 2 a 8 meses e paga 6% de corretagem.`,
+          `<section class="card summary"><span>Land price <b id="t-idx"></b> over 12 months</span>
+          <span>Your land <b id="t-eq"></b></span><span>Farm income so far <b id="t-inc"></b></span>
+          <span>This year's weather <b id="t-clim"></b></span><span>Commodities at <b id="t-cf"></b> of the yearly average</span></section>
+          <section class="card"><h3>Buy land</h3>
+          <p class="muted">Land appreciates with inflation and a bit more. On purchase, 3% transfer tax (ITBI); selling takes 2 to 8 months and pays a 6% broker fee.`) + `
           ${Object.entries(A.CROPS).map(([, c]) => `<b>${c.n}</b>: ${c.d}`).join(' ')}</p><table class="tbl">`;
         for (const l of A.LANDS) {
-          h += `<tr><td><b>${l.n}</b><br><small class="muted">usos: ${l.crops.map(c => A.CROPS[c].n.toLowerCase()).join(', ')}</small></td>
-            <td id="t-p-${l.id}"></td><td><button data-act="agro-buy" data-id="${l.id}" id="b-ab-${l.id}">Comprar <small id="t-c-${l.id}"></small></button></td></tr>`;
+          h += `<tr><td><b>${l.n}</b><br><small class="muted">${tr('usos', 'uses')}: ${l.crops.map(c => A.CROPS[c].n.toLowerCase()).join(', ')}</small></td>
+            <td id="t-p-${l.id}"></td><td><button data-act="agro-buy" data-id="${l.id}" id="b-ab-${l.id}">${tr('Comprar', 'Buy')} <small id="t-c-${l.id}"></small></button></td></tr>`;
         }
         h += '</table></section>';
         if (S.agro.lands.length) {
-          h += '<section class="card"><h3>Suas terras</h3><table class="tbl">';
+          h += `<section class="card"><h3>${tr('Suas terras', 'Your land')}</h3><table class="tbl">`;
           S.agro.lands.forEach((x, i) => {
             const l = A.land(x.id), farm = x.crop === 'soja' || x.crop === 'cafe';
             h += `<tr><td><b>${l.n}</b><br><small class="muted" id="t-s-${i}"></small></td>
               <td><b id="t-v-${i}"></b><br><small id="t-pl-${i}"></small></td>
-              <td>${x.selling ? '<small class="muted">à venda</small>' : `<select data-set="crop" data-i="${i}">${l.crops.map(c =>
+              <td>${x.selling ? `<small class="muted">${tr('à venda', 'for sale')}</small>` : `<select data-set="crop" data-i="${i}">${l.crops.map(c =>
                 `<option value="${c}"${c === x.crop ? ' selected' : ''}>${A.CROPS[c].n}</option>`).join('')}</select>
-                ${farm ? `<label class="check"><input type="checkbox" data-act="agro-ins" data-i="${i}"${x.insured ? ' checked' : ''}> seguro rural</label>` : ''}
-                ${A.operated(x) ? (x.mgr ? '<br><small class="muted">com gerente agrícola</small>'
-                  : S.research.gestao_pessoas ? `<br><button data-act="agro-hire" data-i="${i}">Contratar gerente <small>12% do lucro</small></button>`
-                  : `<br><small class="muted">consome ${l.energy} de energia/dia</small>`) : ''}`}</td>
-              <td>${x.selling ? '' : `<button data-act="agro-sell" data-i="${i}">Vender</button>`}</td></tr>`;
+                ${farm ? `<label class="check"><input type="checkbox" data-act="agro-ins" data-i="${i}"${x.insured ? ' checked' : ''}> ${tr('seguro rural', 'crop insurance')}</label>` : ''}
+                ${A.operated(x) ? (x.mgr ? `<br><small class="muted">${tr('com gerente agrícola', 'with a farm manager')}</small>`
+                  : S.research.gestao_pessoas ? `<br><button data-act="agro-hire" data-i="${i}">${tr('Contratar gerente <small>12% do lucro</small>', 'Hire a manager <small>12% of profit</small>')}</button>`
+                  : `<br><small class="muted">${tr(`consome ${l.energy} de energia/dia`, `drains ${l.energy} energy/day`)}</small>`) : ''}`}</td>
+              <td>${x.selling ? '' : `<button data-act="agro-sell" data-i="${i}">${tr('Vender', 'Sell')}</button>`}</td></tr>`;
           });
           h += '</table></section>';
         }
@@ -1314,11 +1481,12 @@
           set(`t-v-${i}`, f.money(v));
           const pl = $(`t-pl-${i}`);
           if (pl) {
-            pl.textContent = `${f.signedPct(v / x.cost - 1, 1)} desde a compra`;
+            pl.textContent = `${f.signedPct(v / x.cost - 1, 1)} ${tr('desde a compra', 'since purchase')}`;
             pl.className = v >= x.cost ? 'good' : 'bad';
           }
-          const planted = x.planted ? `${x.planted.crop} plantado, colheita em ${f.MESES[x.planted.harvest - 1]}` : '';
-          set(`t-s-${i}`, x.selling ? `à venda: ~${x.selling} dias` : [planted, x.last].filter(Boolean).join(' · ') || A.CROPS[x.crop].n.toLowerCase());
+          const crop = A.PLANTED[x.planted && x.planted.crop] || (x.planted && x.planted.crop);
+          const planted = x.planted ? tr(`${crop} plantado, colheita em ${f.MESES[x.planted.harvest - 1]}`, `${crop} planted, harvest in ${f.MESES[x.planted.harvest - 1]}`) : '';
+          set(`t-s-${i}`, x.selling ? tr(`à venda: ~${x.selling} dias`, `for sale: ~${x.selling} days`) : [planted, x.last].filter(Boolean).join(' · ') || A.CROPS[x.crop].n.toLowerCase());
         });
       },
     },
@@ -1327,25 +1495,31 @@
       key: S => [S.realty.length, S.realty.map(h => (h.selling ? 's' : '-') + (h.loan ? 'l' : '-') + (h.home ? 'h' : '-') + (h.occupied ? 'o' : '-')).join(''), !!S.research.financiamento].join('|'),
       build(S) {
         const R = G.realty, fin = S.research.financiamento;
-        let h = `<section class="card summary"><span>Índice imobiliário <b id="re-idx"></b> em 12 meses</span>
+        let h = tr(`<section class="card summary"><span>Índice imobiliário <b id="re-idx"></b> em 12 meses</span>
           <span>Patrimônio em imóveis <b id="re-eq"></b></span><span>Aluguel líquido <b id="re-rent"></b>/mês</span>
           ${fin ? '<span>Financiamento hoje <b id="re-rate"></b> a.a.</span>' : ''}</section>
           <section class="card"><h3>Comprar</h3>
           <p class="muted">Na compra: 3% de ITBI e cartório. Na venda: 6% de corretagem, 15% de IR sobre o lucro e meses até aparecer comprador.
-          O aluguel paga 8% à imobiliária e 15% de IR; imóvel vago custa condomínio e IPTU.</p><table class="tbl">`;
+          O aluguel paga 8% à imobiliária e 15% de IR; imóvel vago custa condomínio e IPTU.</p><table class="tbl">`,
+          `<section class="card summary"><span>Real estate index <b id="re-idx"></b> over 12 months</span>
+          <span>Real estate equity <b id="re-eq"></b></span><span>Net rent <b id="re-rent"></b>/month</span>
+          ${fin ? '<span>Mortgage rate today <b id="re-rate"></b> p.a.</span>' : ''}</section>
+          <section class="card"><h3>Buy</h3>
+          <p class="muted">On purchase: 3% transfer tax (ITBI) and notary fees. On sale: 6% realtor fee, 15% income tax on the gain and months until a buyer shows up.
+          Rent pays 8% to the property manager and 15% income tax; a vacant property costs building fees and property tax.</p><table class="tbl">`);
         for (const p of G.PROPERTIES) {
-          h += `<tr><td>${p.n}<br><small class="muted">aluguel ~${f.pct(p.yield, 1)} a.a.</small></td><td id="re-p-${p.id}"></td>
-            <td class="ops"><button data-act="re-buy" data-id="${p.id}" id="b-re-${p.id}">À vista <small id="re-c-${p.id}"></small></button>
-            ${fin ? `<button data-act="re-fin" data-id="${p.id}" id="b-rf-${p.id}">Financiar <small id="re-f-${p.id}"></small></button>` : ''}</td></tr>`;
+          h += `<tr><td>${p.n}<br><small class="muted">${tr('aluguel', 'rent')} ~${f.pct(p.yield, 1)} ${tr('a.a.', 'p.a.')}</small></td><td id="re-p-${p.id}"></td>
+            <td class="ops"><button data-act="re-buy" data-id="${p.id}" id="b-re-${p.id}">${tr('À vista', 'Pay cash')} <small id="re-c-${p.id}"></small></button>
+            ${fin ? `<button data-act="re-fin" data-id="${p.id}" id="b-rf-${p.id}">${tr('Financiar', 'Finance')} <small id="re-f-${p.id}"></small></button>` : ''}</td></tr>`;
         }
         h += '</table></section>';
         if (S.realty.length) {
-          h += '<section class="card"><h3>Seus imóveis</h3><table class="tbl">';
+          h += `<section class="card"><h3>${tr('Seus imóveis', 'Your properties')}</h3><table class="tbl">`;
           S.realty.forEach((x, i) => {
             h += `<tr><td>${R.prop(x.pid).n}<br><small class="muted" id="rh-s-${i}"></small></td>
               <td><b id="rh-v-${i}"></b><br><small id="rh-pl-${i}"></small></td><td><small id="rh-l-${i}"></small></td>
-              <td>${x.selling ? '' : `<button data-act="re-sell" data-i="${i}">Vender</button>`}
-                ${x.home ? '<br><small class="good">você mora aqui</small>' : !x.selling && !x.occupied ? `<br><button data-act="home" data-i="${i}" id="b-home-${i}">Morar aqui</button>` : ''}</td></tr>`;
+              <td>${x.selling ? '' : `<button data-act="re-sell" data-i="${i}">${tr('Vender', 'Sell')}</button>`}
+                ${x.home ? `<br><small class="good">${tr('você mora aqui', 'you live here')}</small>` : !x.selling && !x.occupied ? `<br><button data-act="home" data-i="${i}" id="b-home-${i}">${tr('Morar aqui', 'Live here')}</button>` : ''}</td></tr>`;
           });
           h += '</table></section>';
         }
@@ -1364,7 +1538,7 @@
           const cash = R.quote(S, p, false), fin = R.quote(S, p, true);
           set(`re-p-${p.id}`, f.money(R.price(S, p)));
           set(`re-c-${p.id}`, f.money(cash.upfront));
-          set(`re-f-${p.id}`, `entrada ${f.money(fin.upfront)} · ${f.money(fin.pmt)}/mês`);
+          set(`re-f-${p.id}`, tr(`entrada ${f.money(fin.upfront)} · ${f.money(fin.pmt)}/mês`, `${f.money(fin.upfront)} down · ${f.money(fin.pmt)}/month`));
           dis(`b-re-${p.id}`, S.cash < cash.upfront);
           dis(`b-rf-${p.id}`, S.cash < fin.upfront);
           why(`b-re-${p.id}`, need(S, { cash: cash.upfront }));
@@ -1372,18 +1546,20 @@
         }
         S.realty.forEach((x, i) => {
           const v = R.value(S, x);
-          set(`rh-s-${i}`, x.selling ? `à venda: ~${x.selling} dias para fechar` : x.home ? 'sua casa'
-            : x.occupied ? `alugado · ${f.money(R.rent(S, x))}/mês bruto` : 'vago, procurando inquilino');
+          set(`rh-s-${i}`, x.selling ? tr(`à venda: ~${x.selling} dias para fechar`, `for sale: ~${x.selling} days to close`) : x.home ? tr('sua casa', 'your home')
+            : x.occupied ? tr(`alugado · ${f.money(R.rent(S, x))}/mês bruto`, `rented · ${f.money(R.rent(S, x))}/month gross`) : tr('vago, procurando inquilino', 'vacant, looking for a tenant'));
           const small = v < G.life.homeMin(S);
           dis(`b-home-${i}`, small);
-          why(`b-home-${i}`, small ? `pequeno para o seu padrão de vida: precisa valer ${f.money(G.life.homeMin(S))}` : 'para de alugar e corta 40% do custo de vida');
+          why(`b-home-${i}`, small ? tr(`pequeno para o seu padrão de vida: precisa valer ${f.money(G.life.homeMin(S))}`, `too small for your lifestyle: must be worth ${f.money(G.life.homeMin(S))}`)
+            : tr('para de alugar e corta 40% do custo de vida', 'stop renting and cut 40% of your cost of living'));
           set(`rh-v-${i}`, f.money(v));
           const pl = $(`rh-pl-${i}`);
           if (pl) {
-            pl.textContent = `${f.signedPct(v / x.cost - 1, 1)} desde a compra`;
+            pl.textContent = `${f.signedPct(v / x.cost - 1, 1)} ${tr('desde a compra', 'since purchase')}`;
             pl.className = v >= x.cost ? 'good' : 'bad';
           }
-          set(`rh-l-${i}`, x.loan ? `saldo devedor ${f.money(x.loan.bal)} · parcela ${f.money(x.loan.pmt)} · ${x.loan.left} meses` : 'quitado');
+          set(`rh-l-${i}`, x.loan ? tr(`saldo devedor ${f.money(x.loan.bal)} · parcela ${f.money(x.loan.pmt)} · ${x.loan.left} meses`,
+            `balance ${f.money(x.loan.bal)} · payment ${f.money(x.loan.pmt)} · ${x.loan.left} months`) : tr('quitado', 'paid off'));
         });
       },
     },
@@ -1392,21 +1568,26 @@
       key: S => S.angel.deals.map(d => d.name + d.until).join(',') + '|' + S.angel.tickets.length,
       build(S) {
         const A = S.angel;
-        let h = `<section class="card summary"><span>Investido em startups <b id="an-book"></b></span>
+        let h = tr(`<section class="card summary"><span>Investido em startups <b id="an-book"></b></span>
           <span>Retornos já recebidos <b id="an-out"></b></span></section>
           <section class="card"><h3>Rodadas abertas</h3>
           <p class="muted">Cheque de anjo leva anos para voltar, quando volta: 6 em cada 10 quebram. A tração é só um palpite;
-          com due diligence fica bem mais confiável. Lucro paga 15% de IR.</p>`;
-        if (!A.deals.length) h += '<p class="muted">Novas rodadas aparecem todo mês.</p>';
+          com due diligence fica bem mais confiável. Lucro paga 15% de IR.</p>`,
+          `<section class="card summary"><span>Invested in startups <b id="an-book"></b></span>
+          <span>Returns received so far <b id="an-out"></b></span></section>
+          <section class="card"><h3>Open rounds</h3>
+          <p class="muted">An angel check takes years to come back, if it does: 6 in 10 fail. Traction is just a hint;
+          with due diligence it becomes much more reliable. Gains pay 15% income tax.</p>`);
+        if (!A.deals.length) h += tr('<p class="muted">Novas rodadas aparecem todo mês.</p>', '<p class="muted">New rounds show up every month.</p>');
         A.deals.forEach((d, i) => {
           const cls = d.signal === 'forte' ? 'good' : d.signal === 'fraca' ? 'bad' : '';
           h += `<div class="research"><div><b>${d.name}</b> <span class="muted">— ${d.pitch}</span>
-            <p>Tração <b class="${cls}">${d.signal}</b> · cheque de ${f.money(d.ticket)} · <span class="muted" id="an-d-${i}"></span></p></div>
-            <button data-act="angel" data-i="${i}" id="b-an-${i}">Investir</button></div>`;
+            <p>${tr('Tração', 'Traction')} <b class="${cls}">${G.angel.SIGNAL_NAMES[d.signal] || d.signal}</b> · ${tr('cheque de', 'check of')} ${f.money(d.ticket)} · <span class="muted" id="an-d-${i}"></span></p></div>
+            <button data-act="angel" data-i="${i}" id="b-an-${i}">${tr('Investir', 'Invest')}</button></div>`;
         });
         h += '</section>';
         if (A.tickets.length) {
-          h += '<section class="card"><h3>Sua carteira de startups</h3><table class="tbl">';
+          h += `<section class="card"><h3>${tr('Sua carteira de startups', 'Your startup portfolio')}</h3><table class="tbl">`;
           A.tickets.forEach((t, i) => {
             h += `<tr><td>${t.name}</td><td>${f.money(t.amount)}</td><td class="muted" id="an-t-${i}"></td></tr>`;
           });
@@ -1418,13 +1599,14 @@
         set('an-book', f.money(G.angel.book(S)));
         set('an-out', f.money(S.stats.angelOut || 0));
         S.angel.deals.forEach((d, i) => {
-          set(`an-d-${i}`, `rodada fecha em ${d.until - S.day} dias`);
+          set(`an-d-${i}`, tr(`rodada fecha em ${d.until - S.day} dias`, `round closes in ${d.until - S.day} days`));
           dis(`b-an-${i}`, S.cash < d.ticket);
           why(`b-an-${i}`, need(S, { cash: d.ticket }));
         });
         S.angel.tickets.forEach((t, i) => {
           const y = (S.day - t.day) / 360;
-          set(`an-t-${i}`, `investido há ${y < 1 ? Math.floor(S.day - t.day) + ' dias' : f.num(y, 1) + ' anos'} · sem notícias`);
+          const ago = y < 1 ? `${Math.floor(S.day - t.day)} ${tr('dias', 'days')}` : `${f.num(y, 1)} ${tr('anos', 'years')}`;
+          set(`an-t-${i}`, tr(`investido há ${ago} · sem notícias`, `invested ${ago} ago · no news`));
         });
       },
     },
@@ -1433,36 +1615,36 @@
   function buildResources() {
     const row = (id, label) => `<div class="row" id="row-${id}" title="${esc(TIPS[id] || '')}"><span>${label}</span><b id="r-${id}"></b></div>`;
     $('resources').innerHTML = `
-      ${row('cash', 'Caixa')}
-      ${row('nw', 'Patrimônio')}
-      <canvas class="spark zoom" id="r-nwc" data-act="chart" data-id="nw" title="Clique para ampliar" hidden></canvas>
-      ${row('reserve', 'Reserva')}
-      <div class="row" title="${esc(TIPS.en)}"><span>Energia</span><b id="r-en"></b></div>
+      ${row('cash', tr('Caixa', 'Cash'))}
+      ${row('nw', tr('Patrimônio', 'Net worth'))}
+      <canvas class="spark zoom" id="r-nwc" data-act="chart" data-id="nw" title="${tr('Clique para ampliar', 'Click to enlarge')}" hidden></canvas>
+      ${row('reserve', tr('Reserva', 'Reserve'))}
+      <div class="row" title="${esc(TIPS.en)}"><span>${tr('Energia', 'Energy')}</span><b id="r-en"></b></div>
       <div class="bar"><i id="r-enbar"></i></div>
-      ${row('age', 'Idade')}
-      ${row('k', 'Conhecimento')}
-      ${row('rep', 'Reputação')}
-      ${row('status', 'Posição')}
+      ${row('age', tr('Idade', 'Age'))}
+      ${row('k', tr('Conhecimento', 'Knowledge'))}
+      ${row('rep', tr('Reputação', 'Reputation'))}
+      ${row('status', tr('Posição', 'Status'))}
       ${row('stress', 'Stress')}
-      ${row('well', 'Bem-estar')}
-      ${row('inf', 'Influência')}
-      ${row('img', 'Imagem pública')}
-      <h4>Mês</h4>
-      ${row('sal', 'Salário')}
-      ${row('yield', 'Rendimentos')}
-      ${row('rent', 'Aluguéis')}
-      ${row('agro', 'Terras')}
-      ${row('loan', 'Financiamentos')}
-      ${row('biz', 'Empresas')}
-      ${row('fund', 'Gestora')}
-      ${row('social', 'Família e clubes')}
-      ${row('pol', 'Política')}
-      ${row('cost', 'Custo de vida')}
-      ${row('net', 'Sobra')}
-      <h4>Economia</h4>
+      ${row('well', tr('Bem-estar', 'Well-being'))}
+      ${row('inf', tr('Influência', 'Influence'))}
+      ${row('img', tr('Imagem pública', 'Public image'))}
+      <h4>${tr('Mês', 'Month')}</h4>
+      ${row('sal', tr('Salário', 'Salary'))}
+      ${row('yield', tr('Rendimentos', 'Investment income'))}
+      ${row('rent', tr('Aluguéis', 'Rents'))}
+      ${row('agro', tr('Terras', 'Land'))}
+      ${row('loan', tr('Financiamentos', 'Loans'))}
+      ${row('biz', tr('Empresas', 'Businesses'))}
+      ${row('fund', tr('Gestora', 'Asset manager'))}
+      ${row('social', tr('Família e clubes', 'Family and clubs'))}
+      ${row('pol', tr('Política', 'Politics'))}
+      ${row('cost', tr('Custo de vida', 'Cost of living'))}
+      ${row('net', tr('Sobra', 'Surplus'))}
+      <h4>${tr('Economia', 'Economy')}</h4>
       ${row('selic', 'Selic')}
-      ${row('infl', 'Inflação')}
-      <h4>Próximos passos</h4>
+      ${row('infl', tr('Inflação', 'Inflation'))}
+      <h4>${tr('Próximos passos', 'Next steps')}</h4>
       <div id="r-goals"></div>`;
   }
 
@@ -1471,12 +1653,13 @@
     const W = G.work, out = [], nx = W.nextLevel(S);
     if (nx && S.job.employed) {
       const k = Math.max(0, nx.k - S.knowledge), r = Math.max(0, nx.rep - S.reputation);
-      out.push(W.canPromote(S) ? `Promoção a ${nx.t} disponível!`
-        : `${nx.t}: faltam ${[k && f.num(k, 0) + ' conhec.', r && f.num(r, 0) + ' reput.'].filter(Boolean).join(' e ')}`);
+      const lack = [k && f.num(k, 0) + tr(' conhec.', ' knowl.'), r && f.num(r, 0) + tr(' reput.', ' rep.')].filter(Boolean).join(tr(' e ', ' and '));
+      out.push(W.canPromote(S) ? tr(`Promoção a ${nx.t} disponível!`, `Promotion to ${nx.t} available!`)
+        : tr(`${nx.t}: faltam ${lack}`, `${nx.t}: ${lack} short`));
     }
-    if (S.research.fire && S.job.employed) out.push(`FIRE: ${f.pct(Math.max(0, G.portfolio.netWorth(S)) / W.fireNumber(S), 0)} do número`);
+    if (S.research.fire && S.job.employed) out.push(`FIRE: ${f.pct(Math.max(0, G.portfolio.netWorth(S)) / W.fireNumber(S), 0)} ${tr('do número', 'of the number')}`);
     const a = G.legacy.ACHIEVEMENTS.find(x => S.legacy.ach[x.id] === undefined);
-    if (a) out.push(`Conquista: ${a.n}, ${a.d.charAt(0).toLowerCase() + a.d.slice(1)}`);
+    if (a) out.push(`${tr('Conquista', 'Achievement')}: ${a.n}, ${a.d.charAt(0).toLowerCase() + a.d.slice(1)}`);
     return out;
   }
 
@@ -1491,25 +1674,25 @@
     if (!nwc.hidden) spark('r-nwc', nwSeries(S));
     show('row-reserve', S.research.reserva);
     const rm = W.reserveMonths(S);
-    set('r-reserve', rm >= 24 ? f.num(rm / 12, 0) + ' anos' : f.num(rm, 1) + ' meses');
+    set('r-reserve', rm >= 24 ? f.num(rm / 12, 0) + tr(' anos', ' years') : f.num(rm, 1) + tr(' meses', ' months'));
     set('r-en', `${Math.floor(S.energy)}/${W.emax(S)}`);
     $('r-enbar').style.width = `${(100 * S.energy) / W.emax(S)}%`;
     set('r-k', f.num(S.knowledge, 1));
-    set('r-age', `${Math.floor(G.legacy.age(S))} anos${S.legacy.generation > 1 ? ` · ${S.legacy.generation}ª geração` : ''}`);
+    set('r-age', `${Math.floor(G.legacy.age(S))} ${tr('anos', 'years')}${S.legacy.generation > 1 ? ` · ${tr(`${S.legacy.generation}ª geração`, `generation ${S.legacy.generation}`)}` : ''}`);
     set('r-rep', f.num(Math.floor(S.reputation)));
     show('row-status', S.tabs.vida);
     show('row-stress', S.tabs.vida);
     set('r-status', G.social.tierName(S));
     set('r-stress', f.num(S.social.stress, 0));
     show('row-well', S.tabs.vida);
-    set('r-well', f.num(S.life.well, 0) + (S.life.away > 0 ? ' · de férias' : ''));
+    set('r-well', f.num(S.life.well, 0) + (S.life.away > 0 ? tr(' · de férias', ' · on vacation') : ''));
     $('r-stress').className = S.social.stress > 70 ? 'bad' : '';
     show('row-inf', S.tabs.poder);
     show('row-img', S.tabs.poder);
     set('r-inf', f.num(S.pol.influence, 0));
     set('r-img', f.num(S.pol.image, 0));
     $('r-img').className = S.pol.image < -20 ? 'bad' : S.pol.image > 20 ? 'good' : '';
-    set('r-sal', S.job.employed ? f.money(sal) : S.job.retired ? 'vive de renda' : 'desempregado');
+    set('r-sal', S.job.employed ? f.money(sal) : S.job.retired ? tr('vive de renda', 'living off income') : tr('desempregado', 'unemployed'));
     set('r-yield', f.money(yld));
     set('r-cost', '−' + f.money(cost));
     const re = G.realty.monthlyNet(S), bz = G.business.monthlyProfit(S), fd = S.fund ? S.fund.lastProfit : 0;
@@ -1559,12 +1742,12 @@
 
   // Filtros do jornal: cada um aceita alguns tipos de notícia.
   const LOG_FILTERS = [
-    ['tudo', 'Tudo', null],
-    ['bom', 'Bom', ['good']],
-    ['ruim', 'Ruim', ['bad']],
+    ['tudo', tr('Tudo', 'All'), null],
+    ['bom', tr('Bom', 'Good'), ['good']],
+    ['ruim', tr('Ruim', 'Bad'), ['bad']],
     ['macro', 'Macro', ['macro', 'hint']],
-    ['politica', 'Política', ['politica']],
-    ['marcos', 'Marcos', ['unlock', 'story']],
+    ['politica', tr('Política', 'Politics'), ['politica']],
+    ['marcos', tr('Marcos', 'Milestones'), ['unlock', 'story']],
   ];
   function renderLog(S) {
     const cur = S.settings.logFilter || 'tudo', kinds = (LOG_FILTERS.find(x => x[0] === cur) || LOG_FILTERS[0])[2];
@@ -1585,7 +1768,7 @@
     const S = G.S;
     const cs = getComputedStyle(document.body);
     colors = { up: cs.getPropertyValue('--up').trim(), down: cs.getPropertyValue('--down').trim(), accent: cs.getPropertyValue('--warn').trim(), muted: cs.getPropertyValue('--muted').trim() };
-    set('clock', `${f.date(S.day)} · ${G.cal.season(S.day).n}${S.speed === 0 ? ' · pausado' : ''}`);
+    set('clock', `${f.date(S.day)} · ${G.cal.season(S.day).n}${S.speed === 0 ? tr(' · pausado', ' · paused') : ''}`);
     document.querySelectorAll('[data-act="speed"]').forEach(b => b.classList.toggle('active', +b.dataset.v === S.speed));
     $('b-autopause').checked = S.settings.autoPause !== false;
     show('b-sp3', G.legacy.maxSpeed(S) >= 3);
@@ -1605,6 +1788,9 @@
     if (G.debug) set('dbg-info', `${G.macro.REGIMES[S.macro.regime].n} (${S.macro.daysLeft}d) · ${G.macro.POLICIES[S.macro.policy].n}`);
   }
 
+  const BLIND_MSG = tr('Seu patrimônio está num blind trust enquanto você ocupa o cargo: só a estratégia automática opera.',
+    'Your assets are in a blind trust while you hold office: only the automatic strategy trades.');
+
   function onClick(e) {
     const b = e.target.closest('[data-act]');
     if (!b || b.disabled) return;
@@ -1614,7 +1800,7 @@
     const BLIND = ['buy', 'buymax', 'buyfrac', 'sell', 'sellall', 'sellfrac', 're-buy', 're-fin', 're-sell', 'angel', 'biz-open', 'biz-sell', 'biz-fin',
       'biz-hire', 'agro-buy', 'agro-sell', 'agro-hire', 'agro-ins', 'fund-open', 'fund-sell', 'col-buy', 'col-sell', 'home', 'second-buy', 'second-sell'];
     if (BLIND.includes(b.dataset.act) && G.politics.blind(S)) {
-      G.news('Seu patrimônio está num blind trust enquanto você ocupa o cargo: só a estratégia automática opera.', 'info');
+      G.news(BLIND_MSG, 'info');
       render();
       return;
     }
@@ -1647,7 +1833,8 @@
       case 'angel': G.angel.invest(S, +b.dataset.i); break;
       case 'retire': W.retire(S); break;
       case 'succeed':
-        if (confirm('Aposentar e passar o bastão para o herdeiro? Seu personagem sai de cena e a próxima geração começa agora.')) G.legacy.succeed(S, 'aposentadoria');
+        if (confirm(tr('Aposentar e passar o bastão para o herdeiro? Seu personagem sai de cena e a próxima geração começa agora.',
+          'Retire and pass the torch to your heir? Your character leaves the stage and the next generation starts now.'))) G.legacy.succeed(S, 'aposentadoria');
         break;
       case 'legacy-up': G.legacy.buyUpgrade(S, id); break;
       case 'chart': zoom = id; break;
@@ -1681,7 +1868,8 @@
       case 'home': G.life.moveIn(S, +b.dataset.i); break;
       case 'home-out': G.life.moveOut(S); break;
       case 'sabbatical':
-        if (confirm('Tirar um ano sabático? Você fica 12 meses sem salário, mas mantém o cargo.')) G.work.sabbatical(S);
+        if (confirm(tr('Tirar um ano sabático? Você fica 12 meses sem salário, mas mantém o cargo.',
+          'Take a sabbatical year? You go 12 months without salary, but keep your position.'))) G.work.sabbatical(S);
         break;
       case 'retro-toggle': S.settings.retro = b.checked; break;
       case 'habit-start': G.social.startHabit(S, id); break;
@@ -1702,18 +1890,21 @@
       case 'biz-sell': G.business.sell(S, id); break;
       case 'fund-open': G.fund.open(S); break;
       case 'fund-sell':
-        if (confirm(`Vender a gestora por ${f.money(G.fund.saleValue(S))}? Depois, 5 anos sem poder abrir outra.`)) G.fund.sell(S);
+        if (confirm(tr(`Vender a gestora por ${f.money(G.fund.saleValue(S))}? Depois, 5 anos sem poder abrir outra.`,
+          `Sell the asset manager for ${f.money(G.fund.saleValue(S))}? Afterwards, 5 years before you can open another.`))) G.fund.sell(S);
         break;
       case 'theme': setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); break;
+      case 'lang': G.setLang(G.EN ? 'pt' : 'en'); return;
       case 'export': exportFile(); break;
       case 'import': $('import-file').click(); break;
       case 'reset':
-        if (confirm('Começar um jogo novo do zero?\n\nO jogo atual fica guardado: dá para voltar a ele pelo link "Desfazer reinício".')) G.restart();
+        if (confirm(tr('Começar um jogo novo do zero?\n\nO jogo atual fica guardado: dá para voltar a ele pelo link "Desfazer reinício".',
+          'Start a brand-new game from scratch?\n\nThe current game is kept: you can go back to it with the "Undo restart" link.'))) G.restart();
         break;
       case 'undo-reset':
-        if (confirm('Voltar ao jogo de antes do reinício? O jogo novo será descartado.') && G.restoreBackup()) {
+        if (confirm(tr('Voltar ao jogo de antes do reinício? O jogo novo será descartado.', 'Go back to the game from before the restart? The new game will be discarded.')) && G.restoreBackup()) {
           reset();
-          G.news('Jogo anterior restaurado.', 'info');
+          G.news(tr('Jogo anterior restaurado.', 'Previous game restored.'), 'info');
         }
         break;
       case 'dbg-cash': S.cash += 10000; break;
@@ -1748,7 +1939,7 @@
   function setTheme(t) {
     document.documentElement.dataset.theme = t;
     try { localStorage.setItem('juros-compostos-tema', t); } catch (e) { /* sem storage */ }
-    set('b-theme', t === 'dark' ? 'Tema claro' : 'Tema escuro');
+    set('b-theme', t === 'dark' ? tr('Tema claro', 'Light theme') : tr('Tema escuro', 'Dark theme'));
   }
 
   // Exporta o save como arquivo .txt (vai para a pasta de downloads).
@@ -1762,7 +1953,7 @@
     a.download = name;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    G.news(`Save exportado para o arquivo ${name}, na sua pasta de downloads.`, 'info');
+    G.news(tr(`Save exportado para o arquivo ${name}, na sua pasta de downloads.`, `Save exported to the file ${name}, in your downloads folder.`), 'info');
   }
 
   function importText(text) {
@@ -1770,9 +1961,9 @@
       G.S = G.importSave(text);
       G.save();
       reset();
-      G.news('Save importado.', 'info');
+      G.news(tr('Save importado.', 'Save imported.'), 'info');
     } catch (err) {
-      alert('Esse arquivo não é um save válido do Jogo da Vida.');
+      alert(tr('Esse arquivo não é um save válido do Jogo da Vida.', 'That file is not a valid Game of Life save.'));
     }
   }
 
@@ -1789,7 +1980,7 @@
     else if (el.dataset.set === 'robot') S.auto.robot = el.value;
     else if (el.dataset.set === 'routine') S.routine = el.value;
     else if (el.dataset.set === 'crop') {
-      if (G.politics.blind(S)) G.news('Seu patrimônio está num blind trust enquanto você ocupa o cargo: só a estratégia automática opera.', 'info');
+      if (G.politics.blind(S)) G.news(BLIND_MSG, 'info');
       else G.agro.setCrop(S, +el.dataset.i, el.value);
       keys.body = null; // o select volta a mostrar a cultura real
     }

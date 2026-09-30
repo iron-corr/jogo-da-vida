@@ -1,24 +1,25 @@
 (function () {
   const G = globalThis.G = globalThis.G || {};
+  const tr = G.L;
 
   // Empresas: geradores de lucro mensal (os "prédios" do Kittens). cost e profit em R$ de 2026.
   // beta = quanto o lucro sofre com o ciclo; energy = energia/dia que cada unidade sem gerente consome.
   G.BUSINESSES = [
-    { id: 'foodtruck', n: 'Food truck', cost: 60000, profit: 1500, beta: 1, energy: 3, season: { verao: 1.3, inverno: 0.8 }, sector: 'varejo' },
-    { id: 'padaria', n: 'Padaria', cost: 150000, profit: 3200, beta: 0.4, energy: 3, sector: 'varejo' },
-    { id: 'cafeteria', n: 'Franquia de cafeteria', cost: 300000, profit: 6500, beta: 0.8, energy: 4, season: { inverno: 1.2, verao: 0.9 }, sector: 'varejo' },
-    { id: 'pousada', n: 'Pousada no litoral', cost: 800000, profit: 17000, beta: 1.1, energy: 5, season: { verao: 1.7, outono: 0.8, inverno: 0.55, primavera: 0.95 } },
-    { id: 'academia', n: 'Academia', cost: 1200000, profit: 24000, beta: 1, energy: 6, season: { verao: 1.25, inverno: 0.8 } },
-    { id: 'posto', n: 'Posto de gasolina', cost: 2500000, profit: 46000, beta: 0.6, energy: 6, sector: 'utilities' },
-    { id: 'clinica', n: 'Clínica médica', cost: 3000000, profit: 55000, beta: 0.3, energy: 8 },
-    { id: 'escola', n: 'Escola particular', cost: 6000000, profit: 105000, beta: 0.2, energy: 8, season: { verao: 0.8 } },
-    { id: 'construtora', n: 'Construtora', cost: 12000000, profit: 250000, beta: 2.2, energy: 10 },
-    { id: 'fabrica', n: 'Fábrica de autopeças', cost: 20000000, profit: 330000, beta: 1.8, energy: 12, sector: 'commodities' },
-    { id: 'transportadora', n: 'Transportadora', cost: 35000000, profit: 600000, beta: 1.3, energy: 12, sector: 'commodities' },
-    { id: 'supermercado', n: 'Rede de supermercados', cost: 80000000, profit: 1200000, beta: 0.5, energy: 15, season: { primavera: 1.15 }, sector: 'varejo' },
+    { id: 'foodtruck', n: tr('Food truck', 'Food truck'), cost: 60000, profit: 1500, beta: 1, energy: 3, season: { verao: 1.3, inverno: 0.8 }, sector: 'varejo' },
+    { id: 'padaria', n: tr('Padaria', 'Bakery'), cost: 150000, profit: 3200, beta: 0.4, energy: 3, sector: 'varejo' },
+    { id: 'cafeteria', n: tr('Franquia de cafeteria', 'Coffee shop franchise'), cost: 300000, profit: 6500, beta: 0.8, energy: 4, season: { inverno: 1.2, verao: 0.9 }, sector: 'varejo' },
+    { id: 'pousada', n: tr('Pousada no litoral', 'Seaside inn'), cost: 800000, profit: 17000, beta: 1.1, energy: 5, season: { verao: 1.7, outono: 0.8, inverno: 0.55, primavera: 0.95 } },
+    { id: 'academia', n: tr('Academia', 'Gym'), cost: 1200000, profit: 24000, beta: 1, energy: 6, season: { verao: 1.25, inverno: 0.8 } },
+    { id: 'posto', n: tr('Posto de gasolina', 'Gas station'), cost: 2500000, profit: 46000, beta: 0.6, energy: 6, sector: 'utilities' },
+    { id: 'clinica', n: tr('Clínica médica', 'Medical clinic'), cost: 3000000, profit: 55000, beta: 0.3, energy: 8 },
+    { id: 'escola', n: tr('Escola particular', 'Private school'), cost: 6000000, profit: 105000, beta: 0.2, energy: 8, season: { verao: 0.8 } },
+    { id: 'construtora', n: tr('Construtora', 'Construction company'), cost: 12000000, profit: 250000, beta: 2.2, energy: 10 },
+    { id: 'fabrica', n: tr('Fábrica de autopeças', 'Auto parts factory'), cost: 20000000, profit: 330000, beta: 1.8, energy: 12, sector: 'commodities' },
+    { id: 'transportadora', n: tr('Transportadora', 'Trucking company'), cost: 35000000, profit: 600000, beta: 1.3, energy: 12, sector: 'commodities' },
+    { id: 'supermercado', n: tr('Rede de supermercados', 'Supermarket chain'), cost: 80000000, profit: 1200000, beta: 0.5, energy: 15, season: { primavera: 1.15 }, sector: 'varejo' },
     // Fim de jogo: exigem posição social alta. A bolsa é única.
-    { id: 'banco', n: 'Banco digital', cost: 1.5e9, profit: 25e6, beta: 0.8, energy: 40, tier: 4, sector: 'bancos' },
-    { id: 'bolsa', n: 'A bolsa de valores', cost: 50e9, profit: 600e6, beta: 0.5, energy: 60, tier: 5, unique: true },
+    { id: 'banco', n: tr('Banco digital', 'Digital bank'), cost: 1.5e9, profit: 25e6, beta: 0.8, energy: 40, tier: 4, sector: 'bancos' },
+    { id: 'bolsa', n: tr('A bolsa de valores', 'The stock exchange'), cost: 50e9, profit: 600e6, beta: 0.5, energy: 60, tier: 5, unique: true },
   ];
 
   const REGIME = { expansao: 1.1, pico: 1.2, recessao: 0.6, recuperacao: 0.9 };
@@ -89,15 +90,19 @@
       G.social.spent(S, p * (1 - CYCLE[S.macro.regime] * HAIRCUT)); // deságio imediato no patrimônio
       if (financed) {
         B.loans(S).push({ id, bal: q.loan, spread: B.spread(S), left: LOAN_MONTHS });
-        G.news(`${B.bndes(S) ? 'O BNDES' : 'O banco'} financiou ${money(q.loan)} da sua nova unidade de ${b.n.toLowerCase()} ` +
-          `(Selic + ${G.fmt.pct(B.spread(S), 0)}, parcela inicial de ${money(q.pmt)}/mês).`, 'info');
+        G.news(tr(`${B.bndes(S) ? 'O BNDES' : 'O banco'} financiou ${money(q.loan)} da sua nova unidade de ${b.n.toLowerCase()} ` +
+          `(Selic + ${G.fmt.pct(B.spread(S), 0)}, parcela inicial de ${money(q.pmt)}/mês).`,
+          `${B.bndes(S) ? 'The BNDES development bank' : 'The bank'} financed ${money(q.loan)} of your new ${b.n.toLowerCase()} unit ` +
+          `(Selic + ${G.fmt.pct(B.spread(S), 0)}, initial payment of ${money(q.pmt)}/month).`), 'info');
       }
       S.biz.n[id] = B.count(S, id) + 1;
       S.biz.cost[id] = (S.biz.cost[id] || 0) + p;
       if (id === 'bolsa') {
-        G.news('Você comprou a bolsa de valores. Cada negócio fechado no país passa pelo seu balcão. ' +
-          'Não existe mais "o mercado" contra quem apostar: o mercado é você.', 'story');
-      } else G.news(`Você abriu: ${b.n.toLowerCase()} (${S.biz.n[id]}ª unidade).`, 'good');
+        G.news(tr('Você comprou a bolsa de valores. Cada negócio fechado no país passa pelo seu balcão. ' +
+          'Não existe mais "o mercado" contra quem apostar: o mercado é você.',
+          'You bought the stock exchange. Every trade in the country goes through your counter. ' +
+          'There is no longer a "market" to bet against: you are the market.'), 'story');
+      } else G.news(tr(`Você abriu: ${b.n.toLowerCase()} (${S.biz.n[id]}ª unidade).`, `You opened: ${b.n.toLowerCase()} (unit #${S.biz.n[id]}).`), 'good');
     },
     hire(S, id) {
       if (!S.research.gestao_pessoas || B.managers(S, id) >= B.count(S, id)) return;
@@ -120,8 +125,9 @@
         S.cash -= paid;
         L.splice(li, 1);
       }
-      G.news(`Você vendeu uma unidade de ${b.n.toLowerCase()} por ${money(gross)} (líquido ${money(net)}` +
-        (paid ? `; ${money(paid)} foram para quitar o financiamento dela` : '') + ').', 'info');
+      G.news(tr(`Você vendeu uma unidade de ${b.n.toLowerCase()} por ${money(gross)} (líquido ${money(net)}`,
+        `You sold a ${b.n.toLowerCase()} unit for ${money(gross)} (net ${money(net)}`) +
+        (paid ? tr(`; ${money(paid)} foram para quitar o financiamento dela`, `; ${money(paid)} went to pay off its loan`) : '') + ').', 'info');
     },
 
     // Empresas sem gerente comem energia primeiro; sem energia, ficam largadas.
@@ -145,7 +151,7 @@
         if (--l.left <= 0 || l.bal < 1) {
           L.splice(i, 1);
           G.legacy.flag(S, 'quitado');
-          G.news(`Financiamento de ${biz(l.id).n.toLowerCase()} quitado.`, 'good');
+          G.news(tr(`Financiamento de ${biz(l.id).n.toLowerCase()} quitado.`, `Loan for the ${biz(l.id).n.toLowerCase()} paid off.`), 'good');
         }
       }
       const gross = B.monthlyProfit(S);
@@ -154,7 +160,8 @@
       const net = gross * (1 - 0.5 * neglect);
       S.cash += net;
       S.stats.bizIncome = (S.stats.bizIncome || 0) + net;
-      if (neglect > 0.3) G.news(`Suas empresas ficaram largadas ${S.biz.neglect} dias por falta de energia: lucro ${G.fmt.pct(0.5 * neglect, 0)} menor.`, 'bad');
+      if (neglect > 0.3) G.news(tr(`Suas empresas ficaram largadas ${S.biz.neglect} dias por falta de energia: lucro ${G.fmt.pct(0.5 * neglect, 0)} menor.`,
+        `Your businesses were neglected for ${S.biz.neglect} days for lack of energy: profit ${G.fmt.pct(0.5 * neglect, 0)} lower.`), 'bad');
       S.biz.neglect = 0;
       if (S.macro.regime !== 'recessao') return;
       for (const b of G.BUSINESSES) {
@@ -163,7 +170,7 @@
         S.biz.cost[b.id] -= S.biz.cost[b.id] / n;
         S.biz.n[b.id] = n - 1;
         S.biz.mgr[b.id] = Math.min(B.managers(S, b.id), n - 1);
-        G.news(`A recessão fechou uma unidade de ${b.n.toLowerCase()}.`, 'bad');
+        G.news(tr(`A recessão fechou uma unidade de ${b.n.toLowerCase()}.`, `The recession closed one ${b.n.toLowerCase()} unit.`), 'bad');
       }
     },
   };

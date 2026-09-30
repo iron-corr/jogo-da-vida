@@ -1,5 +1,6 @@
 (function () {
   const G = globalThis.G = globalThis.G || {};
+  const tr = G.L;
 
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   const money = v => G.fmt.money(v);
@@ -15,11 +16,11 @@
 
   // Cada robô devolve um multiplicador para a fatia de risco da carteira.
   const ROBOTS = {
-    nenhum: { n: 'Nenhum', d: 'Segue a alocação-alvo à risca.', m: () => 1 },
-    valor: { n: 'Valor', d: 'Mais bolsa quando o P/L está baixo, menos quando está alto.', m: S => clamp(9 / G.market.pe(S), 0.5, 1.5) },
-    ciclo: { n: 'Ciclo', d: 'Mais bolsa com PMI acima de 52, menos abaixo de 49.', m: S => (S.macro.shown.pmi > 52 ? 1.3 : S.macro.shown.pmi < 49 ? 0.6 : 1) },
-    tendencia: { n: 'Tendência', d: 'Mais exposto quando o Ibovespa está acima da média de 200 dias.', m: S => (ibovAboveMA(S) ? 1.2 : 0.7) },
-    contrarian: { n: 'Contrarian', d: 'Compra no medo extremo, reduz na ganância extrema.', m: S => (S.market.fg < 25 ? 1.4 : S.market.fg > 75 ? 0.7 : 1) },
+    nenhum: { n: tr('Nenhum', 'None'), d: tr('Segue a alocação-alvo à risca.', 'Follows the target allocation to the letter.'), m: () => 1 },
+    valor: { n: tr('Valor', 'Value'), d: tr('Mais bolsa quando o P/L está baixo, menos quando está alto.', 'More stocks when the P/E is low, fewer when it is high.'), m: S => clamp(9 / G.market.pe(S), 0.5, 1.5) },
+    ciclo: { n: tr('Ciclo', 'Cycle'), d: tr('Mais bolsa com PMI acima de 52, menos abaixo de 49.', 'More stocks with the PMI above 52, fewer below 49.'), m: S => (S.macro.shown.pmi > 52 ? 1.3 : S.macro.shown.pmi < 49 ? 0.6 : 1) },
+    tendencia: { n: tr('Tendência', 'Trend'), d: tr('Mais exposto quando o Ibovespa está acima da média de 200 dias.', 'More exposed when the Ibovespa is above its 200-day average.'), m: S => (ibovAboveMA(S) ? 1.2 : 0.7) },
+    contrarian: { n: tr('Contrarian', 'Contrarian'), d: tr('Compra no medo extremo, reduz na ganância extrema.', 'Buys in extreme fear, trims in extreme greed.'), m: S => (S.market.fg < 25 ? 1.4 : S.market.fg > 75 ? 0.7 : 1) },
   };
 
   const A = G.auto = {
@@ -72,7 +73,7 @@
         const diff = t[id] * total - P.value(S, id);
         if (diff > band && budget > 0) budget -= P.buy(S, id, Math.min(diff, budget));
       }
-      if (moved > total * 0.01) G.news(`Rebalanceamento: ${money(moved)} realocados para voltar aos alvos.`, 'info');
+      if (moved > total * 0.01) G.news(tr(`Rebalanceamento: ${money(moved)} realocados para voltar aos alvos.`, `Rebalancing: ${money(moved)} reallocated to get back to target.`), 'info');
       return moved;
     },
 

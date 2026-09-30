@@ -1,5 +1,6 @@
 (function () {
   const G = globalThis.G;
+  const tr = G.L;
 
   const OFFLINE_CAP_DAYS = 360;
   const MAX_TICKS_PER_FRAME = 2000;
@@ -58,21 +59,28 @@
       S.tabs[id] = true;
       G.news(msg, 'unlock');
     };
-    if (S.cash >= 400 || G.portfolio.invested(S) > 0) open('investimentos', 'Seu banco oferece uma conta poupança. Dinheiro parado perde para a inflação. Nova aba: Investimentos.');
-    if (S.knowledge >= 3 || Object.keys(S.research).length) open('conhecimento', 'Você percebeu que estudar abre portas. Nova aba: Conhecimento.');
-    if (S.research.edu_fin) open('mercado', 'Você começou a acompanhar o noticiário econômico. Nova aba: Mercado.');
-    if (S.research.imoveis) open('imoveis', 'Você começou a olhar anúncios de imóveis. Nova aba: Imóveis.');
-    if (S.research.empreendedorismo || S.research.gestora) open('negocios', 'Hora de ter o próprio negócio. Nova aba: Negócios.');
-    if (S.job.level >= 1 || S.reputation >= 4) open('vida', 'Com a carreira andando, sua vida social começa a pesar. Nova aba: Vida.');
-    if (G.social.tierIdx(S) >= 2) open('poder', 'Seu nome começa a circular em Brasília. Nova aba: Poder.');
-    if (S.research.agro) open('terras', 'Você começou a visitar fazendas à venda. Nova aba: Terras.');
-    if (S.tabs.vida) open('lazer', 'Tempo livre também conta. Nova aba: Lazer (férias, hobbies, saúde e coleções).');
-    if (S.research.anjo || S.angel.tickets.length) open('startups', 'Um amigo te chamou para um grupo de investidores-anjo. Nova aba: Startups.');
-    if (S.reputation >= 2) open('estilo', 'Com o emprego firme, dá para pensar em onde morar. (Trabalho → Estilo de vida)');
+    if (S.cash >= 400 || G.portfolio.invested(S) > 0) open('investimentos', tr('Seu banco oferece uma conta poupança. Dinheiro parado perde para a inflação. Nova aba: Investimentos.',
+      'Your bank offers a savings account. Idle money loses to inflation. New tab: Investments.'));
+    if (S.knowledge >= 3 || Object.keys(S.research).length) open('conhecimento', tr('Você percebeu que estudar abre portas. Nova aba: Conhecimento.',
+      'You realized that studying opens doors. New tab: Knowledge.'));
+    if (S.research.edu_fin) open('mercado', tr('Você começou a acompanhar o noticiário econômico. Nova aba: Mercado.', 'You started following the economic news. New tab: Market.'));
+    if (S.research.imoveis) open('imoveis', tr('Você começou a olhar anúncios de imóveis. Nova aba: Imóveis.', 'You started browsing property listings. New tab: Real estate.'));
+    if (S.research.empreendedorismo || S.research.gestora) open('negocios', tr('Hora de ter o próprio negócio. Nova aba: Negócios.', 'Time to run your own business. New tab: Business.'));
+    if (S.job.level >= 1 || S.reputation >= 4) open('vida', tr('Com a carreira andando, sua vida social começa a pesar. Nova aba: Vida.',
+      'With your career moving, your social life starts to matter. New tab: Life.'));
+    if (G.social.tierIdx(S) >= 2) open('poder', tr('Seu nome começa a circular em Brasília. Nova aba: Poder.', 'Your name starts making the rounds in Brasília. New tab: Power.'));
+    if (S.research.agro) open('terras', tr('Você começou a visitar fazendas à venda. Nova aba: Terras.', 'You started visiting farms for sale. New tab: Land.'));
+    if (S.tabs.vida) open('lazer', tr('Tempo livre também conta. Nova aba: Lazer (férias, hobbies, saúde e coleções).',
+      'Free time counts too. New tab: Leisure (vacations, hobbies, health and collections).'));
+    if (S.research.anjo || S.angel.tickets.length) open('startups', tr('Um amigo te chamou para um grupo de investidores-anjo. Nova aba: Startups.',
+      'A friend invited you to an angel investor group. New tab: Startups.'));
+    if (S.reputation >= 2) open('estilo', tr('Com o emprego firme, dá para pensar em onde morar. (Trabalho → Estilo de vida)',
+      'With a steady job, you can think about where to live. (Work → Lifestyle)'));
   };
 
   function intro() {
-    G.news('Primeiro dia de estágio. Salário de R$ 1.800, custo de vida de R$ 1.200. O resto é com você.', 'story');
+    G.news(tr('Primeiro dia de estágio. Salário de R$ 1.800, custo de vida de R$ 1.200. O resto é com você.',
+      'First day of your internship. Salary of R$ 1,800, cost of living of R$ 1,200. The rest is up to you.'), 'story');
   }
 
   G.restart = function () {
@@ -92,14 +100,15 @@
     for (let i = 0; i < days; i++) G.tick(G.S);
     G.catchingUp = false;
     const after = G.portfolio.netWorth(G.S);
-    G.news(`Enquanto você esteve fora passaram ${days} dias. Patrimônio: ${G.fmt.money(before)} → ${G.fmt.money(after)}.`, 'story');
+    G.news(tr(`Enquanto você esteve fora passaram ${days} dias. Patrimônio: ${G.fmt.money(before)} → ${G.fmt.money(after)}.`,
+      `While you were away, ${days} days went by. Net worth: ${G.fmt.money(before)} → ${G.fmt.money(after)}.`), 'story');
     // Resumo: o que de mais marcante aconteceu (o jornal guarda os últimos 100 itens).
     const notable = G.S.log.filter(e => e.d > day0 && ['good', 'bad', 'unlock', 'story', 'hint'].includes(e.k)).slice(0, 12).reverse();
-    G.popup(G.S, 'Enquanto você esteve fora', [
-      ['Dias que passaram', String(days)],
-      ['Patrimônio', `${G.fmt.money(before)} → ${G.fmt.money(after)}`],
+    G.popup(G.S, tr('Enquanto você esteve fora', 'While you were away'), [
+      [tr('Dias que passaram', 'Days passed'), String(days)],
+      [tr('Patrimônio', 'Net worth'), `${G.fmt.money(before)} → ${G.fmt.money(after)}`],
       ...notable.map(e => `${G.fmt.date(e.d)} · ${e.t}`),
-      notable.length ? '' : 'Nada de muito marcante: o dinheiro trabalhou em silêncio.',
+      notable.length ? '' : tr('Nada de muito marcante: o dinheiro trabalhou em silêncio.', 'Nothing remarkable: your money worked quietly.'),
     ].filter(Boolean));
     G.popups[G.popups.length - 1].resume = speed;
   }

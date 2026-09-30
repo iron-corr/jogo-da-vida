@@ -1,36 +1,43 @@
 (function () {
   const G = globalThis.G = globalThis.G || {};
+  const tr = G.L;
 
   // Agronegócio: terras que se valorizam (índice G.ASSETS.terra) e podem ser arrendadas ou cultivadas.
   // Rendimentos anuais em fração do valor da terra (V). O clima do ano e o preço das commodities mexem na safra.
   const LANDS = [
-    { id: 'sitio', n: 'Sítio no Sul de Minas (50 ha)', base: 1.5e6, region: 'centro', crops: ['arrendar', 'cafe', 'gado'], energy: 2 },
-    { id: 'goias', n: 'Fazenda em Goiás (2.000 ha)', base: 20e6, region: 'centro', crops: ['arrendar', 'gado', 'soja'], energy: 6 },
-    { id: 'mato_grosso', n: 'Fazenda no Mato Grosso (1.000 ha)', base: 25e6, region: 'centro', crops: ['arrendar', 'soja', 'gado'], energy: 6 },
-    { id: 'parana', n: 'Fazenda no Paraná (500 ha)', base: 30e6, region: 'sul', crops: ['arrendar', 'soja'], energy: 6 },
+    { id: 'sitio', n: tr('Sítio no Sul de Minas (50 ha)', 'Smallholding in southern Minas Gerais (50 ha)'), base: 1.5e6, region: 'centro', crops: ['arrendar', 'cafe', 'gado'], energy: 2 },
+    { id: 'goias', n: tr('Fazenda em Goiás (2.000 ha)', 'Farm in Goiás (2,000 ha)'), base: 20e6, region: 'centro', crops: ['arrendar', 'gado', 'soja'], energy: 6 },
+    { id: 'mato_grosso', n: tr('Fazenda no Mato Grosso (1.000 ha)', 'Farm in Mato Grosso (1,000 ha)'), base: 25e6, region: 'centro', crops: ['arrendar', 'soja', 'gado'], energy: 6 },
+    { id: 'parana', n: tr('Fazenda no Paraná (500 ha)', 'Farm in Paraná (500 ha)'), base: 30e6, region: 'sul', crops: ['arrendar', 'soja'], energy: 6 },
   ];
 
   const CROPS = {
-    arrendar: { n: 'Arrendar', d: 'Um produtor paga ~4% do valor da terra por ano. Sem risco e sem trabalho.' },
-    gado: { n: 'Gado de corte', d: 'Renda mensal de ~7% ao ano. Seca reduz, boi gordo segue as commodities.' },
-    soja: { n: 'Soja', d: 'Planta em outubro, colhe em fevereiro: ~10% ao ano, mas clima e preço mandam.' },
-    cafe: { n: 'Café', d: 'Colhe em julho, com um ano bom e um ruim (bienalidade). Geada pode arrasar a safra.' },
+    arrendar: { n: tr('Arrendar', 'Lease out'), d: tr('Um produtor paga ~4% do valor da terra por ano. Sem risco e sem trabalho.',
+      'A farmer pays ~4% of the land value per year. No risk and no work.') },
+    gado: { n: tr('Gado de corte', 'Beef cattle'), d: tr('Renda mensal de ~7% ao ano. Seca reduz, boi gordo segue as commodities.',
+      'Monthly income of ~7% a year. Drought cuts it; cattle prices follow commodities.') },
+    soja: { n: tr('Soja', 'Soy'), d: tr('Planta em outubro, colhe em fevereiro: ~10% ao ano, mas clima e preço mandam.',
+      'Plant in October, harvest in February: ~10% a year, but weather and prices rule.') },
+    cafe: { n: tr('Café', 'Coffee'), d: tr('Colhe em julho, com um ano bom e um ruim (bienalidade). Geada pode arrasar a safra.',
+      'Harvest in July, alternating a good year and a bad one (biennial cycle). Frost can wreck the crop.') },
   };
 
   // Clima do ano: probabilidades de [excelente, normal, seca, quebra] por região.
   const CLIMATES = {
-    normal: { n: 'normal', centro: [0.15, 0.6, 0.18, 0.07], sul: [0.15, 0.6, 0.18, 0.07] },
+    normal: { n: tr('normal', 'normal'), centro: [0.15, 0.6, 0.18, 0.07], sul: [0.15, 0.6, 0.18, 0.07] },
     el_nino: { n: 'El Niño', centro: [0.08, 0.5, 0.28, 0.14], sul: [0.3, 0.55, 0.1, 0.05] },
     la_nina: { n: 'La Niña', centro: [0.25, 0.55, 0.14, 0.06], sul: [0.06, 0.45, 0.32, 0.17] },
   };
-  const WEATHER = [['excelente', 1.25], ['normal', 1], ['seca', 0.6], ['quebra de safra', 0.3]];
+  const WEATHER = [[tr('excelente', 'excellent'), 1.25], [tr('normal', 'normal'), 1], [tr('seca', 'drought'), 0.6], [tr('quebra de safra', 'crop failure'), 0.3]];
+  // Nome exibido das culturas plantadas (planted.crop guarda a chave).
+  const PLANTED = { soja: tr('soja', 'soy'), milho: tr('milho', 'corn') };
 
   const ITBI = 0.03, BROKER = 0.06, MANAGER_FEE = 0.12, TAX = 0.15, INSURANCE = 0.04;
   const money = v => G.fmt.money(v);
   const land = id => LANDS.find(l => l.id === id);
 
   const A = G.agro = {
-    LANDS, CROPS, CLIMATES, MANAGER_FEE,
+    LANDS, CROPS, CLIMATES, MANAGER_FEE, PLANTED,
     init: () => ({ lands: [], climate: 'normal', income: 0 }),
     land,
     price: (S, l) => l.base * S.market.prices.terra / 100,
@@ -79,14 +86,14 @@
       G.social.spent(S, p * ITBI);
       S.agro.lands.push({ id, paid: p, cost: p * (1 + ITBI), ix: S.market.prices.terra, crop: 'arrendar', mgr: false, insured: false,
         planted: null, frost: 0, selling: 0, last: '' });
-      G.news(`Você comprou: ${l.n}. Por enquanto a terra está arrendada.`, 'good');
+      G.news(tr(`Você comprou: ${l.n}. Por enquanto a terra está arrendada.`, `You bought: ${l.n}. For now the land is leased out.`), 'good');
     },
     setCrop(S, i, crop) {
       const h = S.agro.lands[i];
       if (!h || !land(h.id).crops.includes(crop) || h.crop === crop) return;
       h.crop = crop;
       h.planted = null; // troca de cultura perde o que estava plantado
-      h.last = crop === 'arrendar' ? 'arrendada' : 'aguardando a época de plantio';
+      h.last = crop === 'arrendar' ? tr('arrendada', 'leased out') : tr('aguardando a época de plantio', 'waiting for planting season');
     },
     hire(S, i) {
       const h = S.agro.lands[i];
@@ -100,7 +107,7 @@
       const h = S.agro.lands[i];
       if (!h || h.selling) return;
       h.selling = Math.round(G.rng.int(60, 240) * (S.macro.regime === 'recessao' ? 1.5 : 1));
-      G.news(`${land(h.id).n} à venda. Terra demora para achar comprador.`, 'info');
+      G.news(tr(`${land(h.id).n} à venda. Terra demora para achar comprador.`, `${land(h.id).n} is up for sale. Land takes a while to find a buyer.`), 'info');
     },
 
     daily(S) {
@@ -111,7 +118,7 @@
         const net = gross - G.tax.flat(S, gross - h.cost);
         S.cash += net;
         S.agro.lands.splice(i, 1);
-        G.news(`${land(h.id).n} vendida por ${money(net)} líquidos.`, 'good');
+        G.news(tr(`${land(h.id).n} vendida por ${money(net)} líquidos.`, `${land(h.id).n} sold for ${money(net)} net.`), 'good');
       }
     },
 
@@ -140,7 +147,7 @@
       const ag = S.agro, cf = A.commodityFactor(S);
       if (c.month === 1) {
         ag.climate = G.rng.pick({ normal: 0.6, el_nino: 0.2, la_nina: 0.2 });
-        if (ag.lands.length) G.news(`Previsão do clima para o ano: ${CLIMATES[ag.climate].n}.`, ag.climate === 'normal' ? 'info' : 'hint');
+        if (ag.lands.length) G.news(tr(`Previsão do clima para o ano: ${CLIMATES[ag.climate].n}.`, `Weather forecast for the year: ${CLIMATES[ag.climate].n}.`), ag.climate === 'normal' ? 'info' : 'hint');
       }
       for (const h of ag.lands) {
         if (h.selling) continue;
@@ -153,13 +160,15 @@
           const [wName, wf] = A.weather(S, l.region);
           const gross = (v * 0.07) / 12 * p * (0.7 + 0.3 * cf) * (wf < 1 ? 0.85 : 1);
           A.harvest(S, h, gross, 0, gross);
-          h.last = `gado: ${money(gross)} no mês${wf < 1 ? ` (pasto afetado: ${wName})` : ''}`;
+          h.last = tr(`gado: ${money(gross)} no mês${wf < 1 ? ` (pasto afetado: ${wName})` : ''}`,
+            `cattle: ${money(gross)} this month${wf < 1 ? ` (pasture hit: ${wName})` : ''}`);
         } else if (h.crop === 'soja') {
           if (c.month === 10) { // plantio
             const expected = v * 0.2 * p, cost = 0.5 * expected + (h.insured ? INSURANCE * expected : 0);
             S.cash -= cost;
             h.planted = { crop: 'soja', cost, expected, harvest: 2 };
-            h.last = `soja plantada: ${money(cost)} em insumos${h.insured ? ' e seguro' : ''}`;
+            h.last = tr(`soja plantada: ${money(cost)} em insumos${h.insured ? ' e seguro' : ''}`,
+              `soy planted: ${money(cost)} in inputs${h.insured ? ' and insurance' : ''}`);
           }
           if (c.month === 2 && S.research.safrinha && h.planted === null) { // milho safrinha depois da soja
             const expected = v * 0.07 * p, cost = 0.5 * expected;
@@ -170,7 +179,8 @@
             const [wName, wf] = A.weather(S, l.region), pl = h.planted;
             const net = A.harvest(S, h, pl.expected * cf * wf, pl.cost, pl.expected);
             h.planted = null;
-            h.last = `colheita de ${pl.crop} (${wName}): ${net >= 0 ? 'lucro' : 'prejuízo'} de ${money(Math.abs(net))}`;
+            h.last = tr(`colheita de ${PLANTED[pl.crop]} (${wName}): ${net >= 0 ? 'lucro' : 'prejuízo'} de ${money(Math.abs(net))}`,
+              `${PLANTED[pl.crop]} harvest (${wName}): ${net >= 0 ? 'profit' : 'loss'} of ${money(Math.abs(net))}`);
             G.news(`${l.n}: ${h.last}.`, net >= 0 ? 'good' : 'bad');
             if (wf > 1) G.legacy.flag(S, 'safra');
             if (pl.crop === 'soja' && S.research.safrinha) { // planta o milho logo em seguida
@@ -184,7 +194,8 @@
           S.cash -= ((v * 0.13) + (h.insured ? INSURANCE * v * 0.24 * p : 0)) / 12;
           if (c.month >= 6 && c.month <= 8 && G.rng.chance(ag.climate === 'la_nina' ? 0.05 : 0.02)) {
             h.frost = 2;
-            G.news(`Geada no ${l.n}! A safra de café deste ano e a do próximo ficam comprometidas.`, 'bad');
+            G.news(tr(`Geada no ${l.n}! A safra de café deste ano e a do próximo ficam comprometidas.`,
+              `Frost at the ${l.n}! This year's and next year's coffee crops are compromised.`), 'bad');
           }
           if (c.month === 7) {
             const even = G.cal.of(S.day).year % 2 === 0;
@@ -193,7 +204,8 @@
             const frost = h.frost === 2 ? 0.3 : h.frost === 1 ? 0.6 : 1;
             h.frost = Math.max(0, h.frost - 1);
             const net = A.harvest(S, h, expected * cf * wf * frost, v * 0.13, expected);
-            h.last = `colheita de café, ano ${even ? 'de alta' : 'de baixa'} (${frost < 1 ? 'geada' : wName}): ${money(net)}`;
+            h.last = tr(`colheita de café, ano ${even ? 'de alta' : 'de baixa'} (${frost < 1 ? 'geada' : wName}): ${money(net)}`,
+              `coffee harvest, ${even ? 'on' : 'off'} year (${frost < 1 ? 'frost' : wName}): ${money(net)}`);
             G.news(`${l.n}: ${h.last}.`, net >= 0 ? 'good' : 'bad');
             if (wf > 1 && frost === 1) G.legacy.flag(S, 'safra');
           }

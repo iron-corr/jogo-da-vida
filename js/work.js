@@ -1,27 +1,28 @@
 (function () {
   const G = globalThis.G = globalThis.G || {};
+  const tr = G.L;
 
   // sal em R$ de 2026; corrigido pelo dissídio (wageIndex). k = conhecimento gasto, rep = reputação exigida.
   const CAREER = [
-    { t: 'Estagiário', sal: 1800, k: 0, rep: 0 },
-    { t: 'Assistente', sal: 2800, k: 15, rep: 3 },
-    { t: 'Analista Júnior', sal: 4200, k: 40, rep: 8 },
-    { t: 'Analista Pleno', sal: 6500, k: 90, rep: 18 },
-    { t: 'Analista Sênior', sal: 9800, k: 180, rep: 30 },
-    { t: 'Coordenador', sal: 15000, k: 350, rep: 48 },
-    { t: 'Gerente', sal: 24000, k: 650, rep: 70 },
-    { t: 'Diretor', sal: 42000, k: 1200, rep: 100 },
-    { t: 'Vice-presidente', sal: 75000, k: 2200, rep: 140 },
-    { t: 'CEO', sal: 130000, k: 4000, rep: 200 },
+    { t: tr('Estagiário', 'Intern'), sal: 1800, k: 0, rep: 0 },
+    { t: tr('Assistente', 'Assistant'), sal: 2800, k: 15, rep: 3 },
+    { t: tr('Analista Júnior', 'Junior Analyst'), sal: 4200, k: 40, rep: 8 },
+    { t: tr('Analista Pleno', 'Analyst'), sal: 6500, k: 90, rep: 18 },
+    { t: tr('Analista Sênior', 'Senior Analyst'), sal: 9800, k: 180, rep: 30 },
+    { t: tr('Coordenador', 'Coordinator'), sal: 15000, k: 350, rep: 48 },
+    { t: tr('Gerente', 'Manager'), sal: 24000, k: 650, rep: 70 },
+    { t: tr('Diretor', 'Director'), sal: 42000, k: 1200, rep: 100 },
+    { t: tr('Vice-presidente', 'Vice President'), sal: 75000, k: 2200, rep: 140 },
+    { t: tr('CEO', 'CEO'), sal: 130000, k: 4000, rep: 200 },
   ];
 
   const LIFESTYLE = [
-    { n: 'Quarto dividido', cost: 1200, emax: 100, regen: 25 },
-    { n: 'Kitnet', cost: 2200, emax: 120, regen: 30 },
-    { n: 'Apartamento 1 quarto', cost: 3800, emax: 140, regen: 36 },
-    { n: 'Apartamento 2 quartos + carro', cost: 7000, emax: 170, regen: 44 },
-    { n: 'Casa em condomínio', cost: 14000, emax: 210, regen: 54 },
-    { n: 'Cobertura', cost: 30000, emax: 260, regen: 66 },
+    { n: tr('Quarto dividido', 'Shared room'), cost: 1200, emax: 100, regen: 25 },
+    { n: tr('Kitnet', 'Studio apartment'), cost: 2200, emax: 120, regen: 30 },
+    { n: tr('Apartamento 1 quarto', '1-bedroom apartment'), cost: 3800, emax: 140, regen: 36 },
+    { n: tr('Apartamento 2 quartos + carro', '2-bedroom apartment + car'), cost: 7000, emax: 170, regen: 44 },
+    { n: tr('Casa em condomínio', 'House in a gated community'), cost: 14000, emax: 210, regen: 54 },
+    { n: tr('Cobertura', 'Penthouse'), cost: 30000, emax: 260, regen: 66 },
   ];
 
   // Ordem de venda automática quando o caixa fica negativo: liquidez primeiro, risco por último.
@@ -33,7 +34,7 @@
   const W = G.work = {
     CAREER, LIFESTYLE, OT_COST, STUDY_COST, SEARCH_COST,
     // Trilha da carreira: corporativo (padrão), startup (salário menor + participação) ou academia (professor).
-    TRACKS: { corporativo: { n: 'Corporativo', sal: 1 }, startup: { n: 'Startup', sal: 0.6 }, academia: { n: 'Professor universitário', sal: 0.5 } },
+    TRACKS: { corporativo: { n: tr('Corporativo', 'Corporate'), sal: 1 }, startup: { n: 'Startup', sal: 0.6 }, academia: { n: tr('Professor universitário', 'University professor'), sal: 0.5 } },
     trackMult: S => W.TRACKS[S.job.track || 'corporativo'].sal,
     salaryMult: S => (S.research.negociacao ? 1.1 : 1) * (S.research.mba ? 1.1 : 1) * (S.research.cfa ? 1.15 : 1)
       * (S.job.bonus || 1) * W.trackMult(S) * G.life.salaryMult(S),
@@ -66,7 +67,7 @@
       S.energy -= cost;
       if (S.energy < W.emax(S) * 0.25 && G.rng.chance((S.research.saude ? 0.04 : 0.08) * G.social.burnoutMult(S))) {
         S.burnout = BURNOUT_DAYS;
-        G.news(`Burnout. Você vai precisar de ${BURNOUT_DAYS} dias de descanso.`, 'bad');
+        G.news(tr(`Burnout. Você vai precisar de ${BURNOUT_DAYS} dias de descanso.`, `Burnout. You'll need ${BURNOUT_DAYS} days of rest.`), 'bad');
       }
     },
     overtime(S) {
@@ -90,7 +91,7 @@
       p += 0.03 * G.social.tierIdx(S);
       if (G.rng.chance(p)) {
         Object.assign(S.job, { employed: true, jobless: 0, retired: false, since: S.day, bonus: 1, track: 'corporativo' });
-        G.news(`Contratado de novo como ${CAREER[S.job.level].t}.`, 'good');
+        G.news(tr(`Contratado de novo como ${CAREER[S.job.level].t}.`, `Hired again as ${CAREER[S.job.level].t}.`), 'good');
       }
     },
     // Renda que entra sem trabalhar: juros, dividendos, aluguéis, empresas e gestora.
@@ -106,7 +107,7 @@
       S.job.retired = true;
       S.job.jobless = 0;
       G.legacy.flag(S, 'fire');
-      G.news('Você pediu demissão para viver de renda. Seu tempo agora é seu.', 'story');
+      G.news(tr('Você pediu demissão para viver de renda. Seu tempo agora é seu.', 'You quit to live off your income. Your time is now your own.'), 'story');
     },
     promote(S) {
       if (!W.canPromote(S)) return;
@@ -114,7 +115,7 @@
       S.knowledge -= n.k;
       S.job.level++;
       G.social.gain(S, 1, 2 * S.job.level);
-      G.news(`Promovido a ${n.t}! Novo salário: ${money(W.salary(S))}.`, 'good');
+      G.news(tr(`Promovido a ${n.t}! Novo salário: ${money(W.salary(S))}.`, `Promoted to ${n.t}! New salary: ${money(W.salary(S))}.`), 'good');
     },
     // Ano sabático: 12 meses sem salário, mantendo o cargo. Só com 5 anos na mesma empresa, uma vez a cada 7 anos.
     canSabbatical: S => S.job.employed && !S.job.sabbatical && S.day - (S.job.since || 0) >= 1800
@@ -125,7 +126,8 @@
       S.job.lastSabbatical = S.day;
       S.knowledge += 30;
       S.social.stress = 0;
-      G.news('Ano sabático: um ano inteiro para estudar, viajar e respirar. O cargo te espera.', 'story');
+      G.news(tr('Ano sabático: um ano inteiro para estudar, viajar e respirar. O cargo te espera.',
+        'Sabbatical: a whole year to study, travel and breathe. Your job will be waiting.'), 'story');
     },
 
     setLifestyle(S, i) {
@@ -136,14 +138,14 @@
       G.social.spent(S, c);
       S.lifestyle = i;
       S.energy = Math.min(S.energy, W.emax(S));
-      G.news(`Mudança: agora você mora em ${LIFESTYLE[i].n.toLowerCase()}.`, 'story');
+      G.news(tr(`Mudança: agora você mora em ${LIFESTYLE[i].n.toLowerCase()}.`, `Moving day: you now live in a ${LIFESTYLE[i].n.toLowerCase()}.`), 'story');
     },
 
     ROUTINES: {
-      off: 'Desligado',
-      estudar: 'Estudar',
-      hora_extra: 'Hora extra',
-      misto: 'Metade estudo, metade hora extra',
+      off: tr('Desligado', 'Off'),
+      estudar: tr('Estudar', 'Study'),
+      hora_extra: tr('Hora extra', 'Overtime'),
+      misto: tr('Metade estudo, metade hora extra', 'Half study, half overtime'),
     },
     // Piloto automático: gasta a energia do dia mantendo 25% de reserva (abaixo disso há risco de burnout).
     // Desempregado (sem ter se aposentado), procura emprego antes de qualquer outra coisa.
@@ -178,12 +180,12 @@
       if (c.month === 1) {
         const adj = m.priceIndex / j.wageIndex - 1;
         j.wageIndex = m.priceIndex;
-        G.news(`Dissídio: salários reajustados em ${G.fmt.pct(adj)} pela inflação.`, 'info');
+        G.news(tr(`Dissídio: salários reajustados em ${G.fmt.pct(adj)} pela inflação.`, `Annual wage adjustment: salaries raised ${G.fmt.pct(adj)} for inflation.`), 'info');
       }
 
       if (j.sabbatical && S.day >= j.sabbatical) {
         j.sabbatical = null;
-        G.news('Fim do ano sabático. De volta ao trabalho, com outra cabeça.', 'info');
+        G.news(tr('Fim do ano sabático. De volta ao trabalho, com outra cabeça.', 'Sabbatical over. Back to work with a fresh mind.'), 'info');
       }
       if (j.employed && j.sabbatical) {
         // sem salário, sem reputação e sem risco de demissão
@@ -194,18 +196,18 @@
         S.reputation += W.repGain(S);
         if (c.month === 12) {
           S.cash += sal;
-          G.news(`13º salário: ${money(sal)}.`, 'good');
+          G.news(tr(`13º salário: ${money(sal)}.`, `13th-month salary: ${money(sal)}.`), 'good');
         }
         if (c.month === 2) {
           if (m.regime === 'expansao' || m.regime === 'pico') {
             S.cash += sal;
-            G.news(`A empresa bateu a meta. PLR de ${money(sal)}.`, 'good');
-          } else G.news('Ano fraco: sem PLR desta vez.', 'info');
+            G.news(tr(`A empresa bateu a meta. PLR de ${money(sal)}.`, `The company hit its target. Profit-sharing bonus of ${money(sal)}.`), 'good');
+          } else G.news(tr('Ano fraco: sem PLR desta vez.', 'Weak year: no profit-sharing bonus this time.'), 'info');
         }
       } else if (!j.retired && ++j.jobless <= 4) {
         const b = 1500 * m.priceIndex;
         S.cash += b;
-        G.news(`Seguro-desemprego: ${money(b)} (parcela ${j.jobless} de 4).`, 'info');
+        G.news(tr(`Seguro-desemprego: ${money(b)} (parcela ${j.jobless} de 4).`, `Unemployment insurance: ${money(b)} (payment ${j.jobless} of 4).`), 'info');
       }
 
       const cost = W.cost(S);
@@ -213,18 +215,19 @@
       if (c.month === 1) {
         const x = cost * 0.5;
         S.cash -= x;
-        G.news(`Janeiro: IPTU, IPVA e material escolar levaram ${money(x)}.`, 'bad');
+        G.news(tr(`Janeiro: IPTU, IPVA e material escolar levaram ${money(x)}.`, `January: property tax, vehicle tax and school supplies took ${money(x)}.`), 'bad');
       }
       if (G.rng.chance(0.003)) {
         const x = cost * G.rng.range(1, 4) * G.life.medMult(S);
         S.cash -= x;
-        G.news(`Imprevisto médico: ${money(x)}${S.life.health !== 'nenhum' ? ' (o plano de saúde cobriu o resto)' : ''}.`, 'bad');
+        G.news(tr(`Imprevisto médico: ${money(x)}${S.life.health !== 'nenhum' ? ' (o plano de saúde cobriu o resto)' : ''}.`,
+          `Medical emergency: ${money(x)}${S.life.health !== 'nenhum' ? ' (health insurance covered the rest)' : ''}.`), 'bad');
       }
 
       if (j.employed && !j.sabbatical && G.rng.chance(G.macro.REGIMES[m.regime].layoff * (j.track === 'academia' ? 0.2 : j.track === 'startup' ? 2 : 1))) {
         j.employed = false;
         j.jobless = 0;
-        G.alert(S, 'Você foi demitido. Uma reserva de emergência faria diferença agora.', 'bad');
+        G.alert(S, tr('Você foi demitido. Uma reserva de emergência faria diferença agora.', 'You were laid off. An emergency fund would make a difference now.'), 'bad');
       }
     },
 
@@ -253,7 +256,8 @@
       }
       if (sold.length) {
         const risky = sold.some(x => SETTLE_ORDER.indexOf(x.id) > 2);
-        G.news(`Saldo negativo coberto com venda automática: ${sold.map(x => `${money(x.got)} de ${G.ASSETS[x.id].n}`).join(', ')}.`, risky ? 'bad' : 'info');
+        G.news(tr(`Saldo negativo coberto com venda automática: ${sold.map(x => `${money(x.got)} de ${G.ASSETS[x.id].n}`).join(', ')}.`,
+          `Negative balance covered by an automatic sale: ${sold.map(x => `${money(x.got)} of ${G.ASSETS[x.id].n}`).join(', ')}.`), risky ? 'bad' : 'info');
       }
       // Cheque especial (8% a.m.) até 6 meses de gastos; acima disso o banco renegocia a 2% a.m.
       if (S.cash < 0) {
@@ -261,8 +265,8 @@
         const juros = Math.min(debt, limit) * 0.08 + Math.max(0, debt - limit) * 0.02;
         S.cash -= juros;
         G.news(debt > limit
-          ? `Dívida renegociada: ${money(debt)} devendo, ${money(juros)} de juros este mês.`
-          : `Cheque especial: ${money(juros)} de juros este mês.`, 'bad');
+          ? tr(`Dívida renegociada: ${money(debt)} devendo, ${money(juros)} de juros este mês.`, `Renegotiated debt: ${money(debt)} owed, ${money(juros)} of interest this month.`)
+          : tr(`Cheque especial: ${money(juros)} de juros este mês.`, `Overdraft: ${money(juros)} of interest this month.`), 'bad');
       }
     },
   };

@@ -1,5 +1,6 @@
 (function () {
   const G = globalThis.G = globalThis.G || {};
+  const tr = G.L;
 
   // Vida fora do trabalho: hobbies, coleções, férias, cidade, casa própria, segunda casa, saúde, pet,
   // bem-estar (que também vira legado) e a retrospectiva de cada ano. Valores em R$ de 2026.
@@ -9,53 +10,65 @@
 
   // energy = energia/dia; cost = R$/mês; stress e well por mês (well = pontos no índice de bem-estar).
   const HOBBIES = {
-    corrida: { n: 'Corrida de rua', energy: 3, cost: 150, stress: -3, well: 5, d: '−3 de stress por mês, vida um pouco mais longa e metade da perda de energia com a idade.' },
-    musica: { n: 'Tocar um instrumento', energy: 2, cost: 300, stress: -4, well: 5, d: '−4 de stress por mês.' },
-    fotografia: { n: 'Fotografia', energy: 2, cost: 400, stress: -2, well: 4, vis: 0.3, d: '−2 de stress e +0,3 de visibilidade por mês.' },
-    pesca: { n: 'Pesca', energy: 2, cost: 500, stress: -4, well: 5, d: '−4 de stress por mês. O melhor lugar para pensar em nada.' },
-    vinho: { n: 'Confraria de vinhos', energy: 1, cost: 1500, stress: -2, well: 4, prest: 0.3, d: '−2 de stress e +0,3 de prestígio por mês.' },
-    culinaria: { n: 'Cozinhar', energy: 2, cost: 300, stress: -3, well: 5, costMult: 0.97, d: '−3 de stress por mês e custo de vida −3% (menos delivery).' },
+    corrida: { n: tr('Corrida de rua', 'Road running'), energy: 3, cost: 150, stress: -3, well: 5,
+      d: tr('−3 de stress por mês, vida um pouco mais longa e metade da perda de energia com a idade.', '−3 stress per month, a slightly longer life and half the energy loss with age.') },
+    musica: { n: tr('Tocar um instrumento', 'Play an instrument'), energy: 2, cost: 300, stress: -4, well: 5, d: tr('−4 de stress por mês.', '−4 stress per month.') },
+    fotografia: { n: tr('Fotografia', 'Photography'), energy: 2, cost: 400, stress: -2, well: 4, vis: 0.3,
+      d: tr('−2 de stress e +0,3 de visibilidade por mês.', '−2 stress and +0.3 visibility per month.') },
+    pesca: { n: tr('Pesca', 'Fishing'), energy: 2, cost: 500, stress: -4, well: 5,
+      d: tr('−4 de stress por mês. O melhor lugar para pensar em nada.', '−4 stress per month. The best place to think about nothing.') },
+    vinho: { n: tr('Confraria de vinhos', 'Wine club'), energy: 1, cost: 1500, stress: -2, well: 4, prest: 0.3,
+      d: tr('−2 de stress e +0,3 de prestígio por mês.', '−2 stress and +0.3 prestige per month.') },
+    culinaria: { n: tr('Cozinhar', 'Cooking'), energy: 2, cost: 300, stress: -3, well: 5, costMult: 0.97,
+      d: tr('−3 de stress por mês e custo de vida −3% (menos delivery).', '−3 stress per month and cost of living −3% (less takeout).') },
   };
 
   // Coleções: o valor segue um índice oculto (ver assets.js). Lotes com preço, visibilidade e prestígio.
   const COLLECTIONS = {
-    arte: { n: 'Arte', asset: 'arte', lots: ['Gravura de um artista promissor', 'Tela de um modernista', 'Obra de um mestre'] },
-    vinhos: { n: 'Vinhos raros', asset: 'vinhos', lots: ['Caixas de grandes safras', 'Adega de colecionador', 'Garrafas históricas'] },
-    classicos: { n: 'Carros clássicos', asset: 'classicos', lots: ['Fusca 1968 restaurado', 'Mercedes dos anos 60', 'Ferrari clássica'] },
+    arte: { n: tr('Arte', 'Art'), asset: 'arte',
+      lots: tr(['Gravura de um artista promissor', 'Tela de um modernista', 'Obra de um mestre'], ['Print by a promising artist', 'Canvas by a modernist', 'Work by an old master']) },
+    vinhos: { n: tr('Vinhos raros', 'Rare wines'), asset: 'vinhos',
+      lots: tr(['Caixas de grandes safras', 'Adega de colecionador', 'Garrafas históricas'], ['Cases of great vintages', 'A collector\'s cellar', 'Historic bottles']) },
+    classicos: { n: tr('Carros clássicos', 'Classic cars'), asset: 'classicos',
+      lots: tr(['Fusca 1968 restaurado', 'Mercedes dos anos 60', 'Ferrari clássica'], ['Restored 1968 VW Beetle', '1960s Mercedes', 'Classic Ferrari']) },
   };
   const LOTS = [{ cost: 50000, vis: 1, prest: 0.3 }, { cost: 500000, vis: 4, prest: 2 }, { cost: 5e6, vis: 15, prest: 8 }];
   const AUCTION_FEE = 0.1;
 
   const DESTINATIONS = [
-    { id: 'praia', n: 'Praia no Nordeste', cost: 6000, days: 10, stress: -15, vis: 0 },
-    { id: 'mochilao', n: 'Mochilão pela América do Sul', cost: 12000, days: 20, stress: -20, vis: 0.5 },
-    { id: 'europa', n: 'Europa', cost: 40000, days: 15, stress: -25, vis: 2 },
-    { id: 'japao', n: 'Japão', cost: 60000, days: 15, stress: -25, vis: 2 },
-    { id: 'safari', n: 'Safári na África', cost: 90000, days: 12, stress: -30, vis: 3 },
-    { id: 'antartida', n: 'Expedição à Antártida', cost: 180000, days: 15, stress: -35, vis: 5 },
+    { id: 'praia', n: tr('Praia no Nordeste', 'Beach in northeastern Brazil'), cost: 6000, days: 10, stress: -15, vis: 0 },
+    { id: 'mochilao', n: tr('Mochilão pela América do Sul', 'Backpacking across South America'), cost: 12000, days: 20, stress: -20, vis: 0.5 },
+    { id: 'europa', n: tr('Europa', 'Europe'), cost: 40000, days: 15, stress: -25, vis: 2 },
+    { id: 'japao', n: tr('Japão', 'Japan'), cost: 60000, days: 15, stress: -25, vis: 2 },
+    { id: 'safari', n: tr('Safári na África', 'African safari'), cost: 90000, days: 12, stress: -30, vis: 3 },
+    { id: 'antartida', n: tr('Expedição à Antártida', 'Antarctic expedition'), cost: 180000, days: 15, stress: -35, vis: 5 },
   ];
 
   const CITIES = {
-    bh: { n: 'Belo Horizonte', cost: 1, sal: 1, rep: 0, stress: 0, well: 0, d: 'Onde tudo começou.' },
-    sp: { n: 'São Paulo', cost: 1.35, sal: 1.25, rep: 0.3, stress: 2, well: -2, d: 'Salário +25% e +0,3 de reputação por mês, mas custo +35% e mais stress.' },
-    interior: { n: 'Interior', cost: 0.75, sal: 0.85, rep: 0, stress: -2, well: 2, d: 'Custo −25%, salário −15%, vida mais calma.' },
-    litoral: { n: 'Litoral', cost: 1, sal: 0.9, rep: 0, stress: -3, well: 4, d: 'Salário −10%, mas mar todo dia: menos stress e mais bem-estar.' },
+    bh: { n: 'Belo Horizonte', cost: 1, sal: 1, rep: 0, stress: 0, well: 0, d: tr('Onde tudo começou.', 'Where it all began.') },
+    sp: { n: 'São Paulo', cost: 1.35, sal: 1.25, rep: 0.3, stress: 2, well: -2,
+      d: tr('Salário +25% e +0,3 de reputação por mês, mas custo +35% e mais stress.', 'Salary +25% and +0.3 reputation per month, but costs +35% and more stress.') },
+    interior: { n: tr('Interior', 'Countryside town'), cost: 0.75, sal: 0.85, rep: 0, stress: -2, well: 2,
+      d: tr('Custo −25%, salário −15%, vida mais calma.', 'Costs −25%, salary −15%, a calmer life.') },
+    litoral: { n: tr('Litoral', 'Coast'), cost: 1, sal: 0.9, rep: 0, stress: -3, well: 4,
+      d: tr('Salário −10%, mas mar todo dia: menos stress e mais bem-estar.', 'Salary −10%, but the sea every day: less stress and more well-being.') },
   };
   const HOME_SHARE = 0.4; // parte do custo de vida que é moradia
   const HOME_MIN = 60;    // o imóvel precisa valer 60× o custo mensal do padrão
 
   const SECOND = [
-    { id: 'praia', n: 'Casa de praia', base: 900000 },
-    { id: 'sitio', n: 'Sítio de fim de semana', base: 1500000 },
+    { id: 'praia', n: tr('Casa de praia', 'Beach house'), base: 900000 },
+    { id: 'sitio', n: tr('Sítio de fim de semana', 'Weekend country house'), base: 1500000 },
   ];
 
   const PLANS = {
-    nenhum: { n: 'Sem plano', cost: 0, med: 1 },
-    basico: { n: 'Plano básico', cost: 600, med: 0.3 },
-    premium: { n: 'Plano premium', cost: 2500, med: 0.05 },
+    nenhum: { n: tr('Sem plano', 'No plan'), cost: 0, med: 1 },
+    basico: { n: tr('Plano básico', 'Basic plan'), cost: 600, med: 0.3 },
+    premium: { n: tr('Plano premium', 'Premium plan'), cost: 2500, med: 0.05 },
   };
 
-  const PET_NAMES = ['Paçoca', 'Biscoito', 'Luna', 'Thor', 'Mel', 'Pipoca', 'Bolinha', 'Nina', 'Fred', 'Amora'];
+  const PET_NAMES = tr(['Paçoca', 'Biscoito', 'Luna', 'Thor', 'Mel', 'Pipoca', 'Bolinha', 'Nina', 'Fred', 'Amora'],
+    ['Peanut', 'Cookie', 'Luna', 'Thor', 'Honey', 'Popcorn', 'Buddy', 'Nina', 'Fred', 'Berry']);
   const PET_COST = 400, PET_ADOPT = 2000;
 
   const L = G.life = {
@@ -65,6 +78,9 @@
       city: 'bh', health: 'nenhum', healthBonus: false, pet: null,
       well: 50, wellSum: 0, wellN: 0, yearWellSum: 0, yearWellN: 0, retro: null, cvm: null, cd: {},
     }),
+
+    // Nome do último destino de férias (saves antigos guardam o nome em vez do id).
+    destName: v => (DESTINATIONS.find(d => d.id === v) || { n: v }).n,
 
     // ---------- efeitos consultados por outros módulos ----------
     city: S => CITIES[S.life.city] || CITIES.bh,
@@ -115,7 +131,8 @@
       for (const x of S.realty) x.home = false;
       h.home = true;
       G.social.addStress(S, -5);
-      G.news(`Você se mudou para o seu próprio imóvel (${G.realty.prop(h.pid).n.toLowerCase()}). Chega de aluguel.`, 'good');
+      G.news(tr(`Você se mudou para o seu próprio imóvel (${G.realty.prop(h.pid).n.toLowerCase()}). Chega de aluguel.`,
+        `You moved into your own property (${G.realty.prop(h.pid).n.toLowerCase()}). No more rent.`), 'good');
     },
     moveOut(S) {
       const h = L.home(S);
@@ -130,7 +147,8 @@
       S.cash -= c;
       G.social.spent(S, c);
       S.life.city = id;
-      G.news(`Mudança de cidade: agora você mora em ${CITIES[id].n}.${S.job.employed ? ' A empresa aceitou a transferência.' : ''}`, 'story');
+      G.news(tr(`Mudança de cidade: agora você mora em ${CITIES[id].n}.${S.job.employed ? ' A empresa aceitou a transferência.' : ''}`,
+        `New city: you now live in ${CITIES[id].n}.${S.job.employed ? ' Your company approved the transfer.' : ''}`), 'story');
     },
 
     // ---------- hobbies ----------
@@ -138,7 +156,7 @@
     startHobby(S, id) {
       if (!HOBBIES[id] || S.life.hobbies[id] || Object.keys(S.life.hobbies).length >= L.hobbySlots(S)) return;
       S.life.hobbies[id] = { missed: 0, since: S.day };
-      G.news(`Novo hobby: ${HOBBIES[id].n.toLowerCase()}.`, 'good');
+      G.news(tr(`Novo hobby: ${HOBBIES[id].n.toLowerCase()}.`, `New hobby: ${HOBBIES[id].n.toLowerCase()}.`), 'good');
     },
     stopHobby(S, id) { delete S.life.hobbies[id]; },
 
@@ -151,13 +169,14 @@
       S.cash -= cost;
       S.life.collections.push({ kind, lot: i, asset: c.asset, paid: cost, cost, ix: S.market.prices[c.asset], selling: 0 });
       G.social.gain(S, lot.vis, lot.prest);
-      G.news(`Nova peça na coleção: ${c.lots[i].toLowerCase()}.`, 'good');
+      G.news(tr(`Nova peça na coleção: ${c.lots[i].toLowerCase()}.`, `New piece in the collection: ${c.lots[i]}.`), 'good');
     },
     sellLot(S, i) {
       const h = S.life.collections[i];
       if (!h || h.selling) return;
       h.selling = G.rng.int(30, 120);
-      G.news(`${COLLECTIONS[h.kind].lots[h.lot]} vai a leilão. A casa de leilões cobra 10%.`, 'info');
+      G.news(tr(`${COLLECTIONS[h.kind].lots[h.lot]} vai a leilão. A casa de leilões cobra 10%.`,
+        `${COLLECTIONS[h.kind].lots[h.lot]} goes to auction. The auction house charges 10%.`), 'info');
     },
 
     // ---------- férias ----------
@@ -172,11 +191,12 @@
       const cost = L.vacationCost(S, d);
       S.cash -= cost;
       G.social.spent(S, cost);
-      Object.assign(S.life, { away: d.days, vacYear: G.cal.of(S.day).year, lastDest: d.n });
+      Object.assign(S.life, { away: d.days, vacYear: G.cal.of(S.day).year, lastDest: d.id });
       S.life.bucket[id] = true;
       G.social.addStress(S, d.stress);
       G.social.gain(S, d.vis, 0);
-      G.news(`Férias: ${d.n}${cost ? '' : ' (na sua casa de praia)'}. ${d.days} dias longe de tudo.`, 'good');
+      G.news(tr(`Férias: ${d.n}${cost ? '' : ' (na sua casa de praia)'}. ${d.days} dias longe de tudo.`,
+        `Vacation: ${d.n}${cost ? '' : ' (at your beach house)'}. ${d.days} days away from it all.`), 'good');
     },
 
     // ---------- segunda casa ----------
@@ -189,13 +209,14 @@
       S.cash -= total;
       G.social.spent(S, p * G.realty.ITBI);
       S.life.second.push({ id, asset: 'imob', paid: p, cost: total, ix: S.market.prices.imob, selling: 0 });
-      G.news(`Você comprou: ${s.n.toLowerCase()}. Os fins de semana nunca mais foram os mesmos.`, 'good');
+      G.news(tr(`Você comprou: ${s.n.toLowerCase()}. Os fins de semana nunca mais foram os mesmos.`,
+        `You bought: ${s.n.toLowerCase()}. Weekends were never the same again.`), 'good');
     },
     sellSecond(S, i) {
       const h = S.life.second[i];
       if (!h || h.selling) return;
       h.selling = G.rng.int(30, 180);
-      G.news(`${SECOND.find(x => x.id === h.id).n} anunciada para venda.`, 'info');
+      G.news(tr(`${SECOND.find(x => x.id === h.id).n} anunciada para venda.`, `${SECOND.find(x => x.id === h.id).n} listed for sale.`), 'info');
     },
 
     // ---------- saúde e pet ----------
@@ -212,7 +233,7 @@
       S.cash -= PET_ADOPT * pi(S);
       const name = G.rng.item(PET_NAMES);
       S.life.pet = { name, born: S.day, dies: S.day + G.rng.int(10, 15) * 360 };
-      G.news(`Você adotou um cachorro: ${name}. A casa ficou mais barulhenta e mais feliz.`, 'good');
+      G.news(tr(`Você adotou um cachorro: ${name}. A casa ficou mais barulhenta e mais feliz.`, `You adopted a dog: ${name}. The house got louder and happier.`), 'good');
     },
 
     // ---------- bem-estar ----------
@@ -240,7 +261,7 @@
       if (lf.away > 0) {
         lf.away--;
         S.energy = G.work.emax(S);
-        if (!lf.away) G.news('De volta das férias, com a cabeça no lugar.', 'info');
+        if (!lf.away) G.news(tr('De volta das férias, com a cabeça no lugar.', 'Back from vacation, with a clear head.'), 'info');
       }
       for (const id in lf.hobbies) {
         const e = HOBBIES[id].energy;
@@ -258,7 +279,7 @@
           S.cash += net;
           list.splice(i, 1);
           const n = coll ? COLLECTIONS[h.kind].lots[h.lot] : SECOND.find(x => x.id === h.id).n;
-          G.news(`${n} vendido(a) por ${money(net)} líquidos.`, net >= h.cost ? 'good' : 'bad');
+          G.news(tr(`${n} vendido(a) por ${money(net)} líquidos.`, `${n} sold for ${money(net)} net.`), net >= h.cost ? 'good' : 'bad');
         }
       }
     },
@@ -281,7 +302,8 @@
         G.social.addStress(S, -3);
         if (S.day >= lf.pet.dies) {
           G.social.addStress(S, 15);
-          G.alert(S, `${lf.pet.name} morreu, depois de ${Math.round((S.day - lf.pet.born) / 360)} anos ao seu lado. A casa ficou em silêncio.`, 'bad');
+          G.alert(S, tr(`${lf.pet.name} morreu, depois de ${Math.round((S.day - lf.pet.born) / 360)} anos ao seu lado. A casa ficou em silêncio.`,
+            `${lf.pet.name} died, after ${Math.round((S.day - lf.pet.born) / 360)} years by your side. The house went quiet.`), 'bad');
           lf.pet = null;
         }
       }
@@ -290,7 +312,7 @@
         // Um ano inteiro sem férias cobra seu preço.
         if (S.day - S.birthDay > 360 && lf.vacYear !== c.year - 1) {
           G.social.addStress(S, 10);
-          G.news('Um ano inteiro sem férias. O cansaço acumulou.', 'bad');
+          G.news(tr('Um ano inteiro sem férias. O cansaço acumulou.', 'A whole year without a vacation. The fatigue piled up.'), 'bad');
         }
         L.retrospective(S, c);
       }
@@ -321,16 +343,17 @@
       const pick = kind => S.log.find(e => e.d >= was.day && e.k === kind);
       const marks = [pick('unlock'), pick('good'), pick('bad')].filter(Boolean).map(e => `${G.fmt.date(e.d)} · ${e.t}`);
       const growth = was.real > 0 ? now.real / was.real - 1 : 0;
-      const verdict = well >= 70 ? 'Um ano bom de viver.' : well >= 50 ? 'Um ano razoável.' : well >= 35 ? 'Um ano pesado.' : 'Um ano difícil, daqueles que a gente quer esquecer.';
-      G.popup(S, `Retrospectiva de ${year}`, [
+      const verdict = well >= 70 ? tr('Um ano bom de viver.', 'A good year to be alive.') : well >= 50 ? tr('Um ano razoável.', 'A decent year.')
+        : well >= 35 ? tr('Um ano pesado.', 'A heavy year.') : tr('Um ano difícil, daqueles que a gente quer esquecer.', 'A hard year, the kind you want to forget.');
+      G.popup(S, tr(`Retrospectiva de ${year}`, `${year} in review`), [
         verdict,
-        ['Patrimônio', `${money(was.nw)} → ${money(now.nw)} (${G.fmt.signedPct(growth, 1)} real)`],
-        ['Salários', money(d('work'))],
-        ['Dividendos e aluguéis', money(d('div') + d('rent'))],
-        ['Empresas e gestora', money(d('biz') + d('fund'))],
-        ['IR pago', money(d('tax'))],
-        ['Bem-estar médio', G.fmt.num(well, 0)],
-        ['Férias', lf.vacYear === year && lf.lastDest ? lf.lastDest : 'não tirou'],
+        [tr('Patrimônio', 'Net worth'), `${money(was.nw)} → ${money(now.nw)} (${G.fmt.signedPct(growth, 1)} ${tr('real', 'real')})`],
+        [tr('Salários', 'Salaries'), money(d('work'))],
+        [tr('Dividendos e aluguéis', 'Dividends and rents'), money(d('div') + d('rent'))],
+        [tr('Empresas e gestora', 'Businesses and asset manager'), money(d('biz') + d('fund'))],
+        [tr('IR pago', 'Income tax paid'), money(d('tax'))],
+        [tr('Bem-estar médio', 'Average well-being'), G.fmt.num(well, 0)],
+        [tr('Férias', 'Vacation'), lf.vacYear === year && lf.lastDest ? L.destName(lf.lastDest) : tr('não tirou', 'none taken')],
         ...marks,
       ]);
     },

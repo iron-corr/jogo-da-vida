@@ -1,5 +1,6 @@
 (function () {
   const G = globalThis.G = globalThis.G || {};
+  const tr = G.L;
 
   // IR simplificado:
   // - renda fixa: tabela regressiva, retida na venda de cada lote
@@ -86,12 +87,13 @@
       }
       if (t.criptoSales > CRYPTO_EXEMPT && t.criptoGain > 0) due += t.criptoGain * 0.15;
       const prev = G.fmt.MESES[(c.month + 10) % 12];
-      if (exempt) G.news(`Vendas de ações em ${prev} abaixo de ${G.fmt.money(T.exemptSales(S))}: lucro de ${G.fmt.money(acao)} isento de IR.`, 'good');
+      if (exempt) G.news(tr(`Vendas de ações em ${prev} abaixo de ${G.fmt.money(T.exemptSales(S))}: lucro de ${G.fmt.money(acao)} isento de IR.`,
+        `Stock sales in ${prev} below ${G.fmt.money(T.exemptSales(S))}: ${G.fmt.money(acao)} gain is income-tax free.`), 'good');
       due *= G.legacy.taxMult(S);
       if (due > 0) {
         S.cash -= due;
         t.paid += due;
-        G.news(`DARF de ${prev}: ${G.fmt.money(due)} de IR sobre renda variável.`, 'bad');
+        G.news(tr(`DARF de ${prev}: ${G.fmt.money(due)} de IR sobre renda variável.`, `Tax bill (DARF) for ${prev}: ${G.fmt.money(due)} of income tax on equities.`), 'bad');
       }
       t.acaoSales = 0;
       t.acaoGain = 0;
