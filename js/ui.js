@@ -1409,7 +1409,7 @@
 
     negocios: {
       key: S => [!!S.research.empreendedorismo, !!S.research.gestao_pessoas, !!S.research.gestora, !!S.fund,
-        G.BUSINESSES.map(b => G.business.count(S, b.id) > 0 ? 1 : 0).join(''), G.social.tierIdx(S)].join('|'),
+        G.BUSINESSES.map(b => G.business.count(S, b.id) > 0 ? 1 : 0).join(''), G.social.tierIdx(S), G.business.loans(S).map(l => l.id).join()].join('|'),
       build(S) {
         const B = G.business;
         let h = '';
@@ -1437,10 +1437,24 @@
               <td><span id="bz-u-${b.id}"></span>${tr('/mês cada', '/month each')}</td>
               <td class="ops"><button data-act="biz-open" data-id="${b.id}" id="b-bo-${b.id}">${tr('Abrir', 'Open')} <small id="bz-p-${b.id}"></small></button>
               <button data-act="biz-fin" data-id="${b.id}" id="b-bf-${b.id}">${tr('Financiar', 'Finance')} <small id="bz-f-${b.id}"></small></button>
-              ${S.research.gestao_pessoas ? `<button data-act="biz-hire" data-id="${b.id}" id="b-bh-${b.id}">${tr('Contratar gerente', 'Hire a manager')}</button>` : ''}
+              ${S.research.gestao_pessoas ? `<button data-act="biz-hire" data-id="${b.id}" id="b-bh-${b.id}">${tr('Contratar gerente', 'Hire a manager')}</button>
+              ${B.count(S, b.id) ? `<button data-act="biz-fire" data-id="${b.id}" id="b-bx-${b.id}">${tr('Demitir gerente', 'Fire a manager')} <small id="bz-x-${b.id}"></small></button>` : ''}` : ''}
               <button data-act="biz-sell" data-id="${b.id}" id="b-bs-${b.id}">${tr('Vender uma', 'Sell one')} <small id="bz-s-${b.id}"></small></button></td></tr>`;
           }
           h += '</table></section>';
+          if (B.loans(S).length) {
+            h += `<section class="card"><h3>${tr('Financiamentos', 'Loans')}</h3>
+              <p class="muted">${tr('Amortizar abate o saldo sem multa: escolha baixar a parcela (mesmo prazo) ou o prazo (mesma parcela).',
+                'Prepaying cuts the balance with no penalty: choose to lower the payment (same term) or the term (same payment).')}</p><table class="tbl">`;
+            B.loans(S).forEach((l, k) => {
+              h += `<tr><td><b>${B.biz(l.id).n}</b><br><small class="muted" id="bl-s-${k}"></small></td>
+                <td class="ops"><input id="bl-in-${k}" inputmode="decimal" size="10" placeholder="${tr('valor em R$', 'amount in R$')}">
+                <button data-act="biz-prepay" data-i="${k}" data-mode="pmt" id="b-blp-${k}">${tr('Amortizar ↓ parcela', 'Prepay ↓ payment')}</button>
+                <button data-act="biz-prepay" data-i="${k}" data-mode="term" id="b-blt-${k}">${tr('Amortizar ↓ prazo', 'Prepay ↓ term')}</button>
+                <button data-act="biz-payoff" data-i="${k}" id="b-blq-${k}">${tr('Quitar', 'Pay off')} <small id="bl-q-${k}"></small></button></td></tr>`;
+            });
+            h += '</table></section>';
+          }
         }
         if (S.research.gestora) {
           h += `<section class="card"><h3>${tr('Gestora', 'Asset manager')}</h3>`;
@@ -1497,9 +1511,22 @@
             dis(`b-bf-${b.id}`, S.cash < q.down || !B.allowed(S, b));
             why(`b-bf-${b.id}`, tierMsg || need(S, { cash: q.down }));
             dis(`b-bh-${b.id}`, m >= n);
+            const sev = B.severance(S, b.id);
+            set(`bz-x-${b.id}`, m ? tr(`rescisão ${f.money(sev)}`, `severance ${f.money(sev)}`) : '');
+            dis(`b-bx-${b.id}`, !m || S.cash < sev);
+            why(`b-bx-${b.id}`, !m ? tr('nenhuma unidade com gerente', 'no unit has a manager') : need(S, { cash: sev }));
             dis(`b-bs-${b.id}`, !n);
             set(`bz-s-${b.id}`, n ? f.money(B.saleValue(S, b)) : '');
           }
+          B.loans(S).forEach((l, k) => {
+            set(`bl-s-${k}`, tr(`saldo ${f.money(l.bal)} · parcela ${f.money(B.loanPayment(S, l))} · ${l.left} meses`,
+              `balance ${f.money(l.bal)} · payment ${f.money(B.loanPayment(S, l))} · ${l.left} months`));
+            set(`bl-q-${k}`, f.money(l.bal));
+            dis(`b-blp-${k}`, S.cash <= 0);
+            dis(`b-blt-${k}`, S.cash <= 0);
+            dis(`b-blq-${k}`, S.cash < l.bal);
+            why(`b-blq-${k}`, need(S, { cash: l.bal }));
+          });
         }
         if (S.fund) {
           const F = G.fund;
@@ -1550,7 +1577,8 @@
               <td>${x.selling ? `<small class="muted">${tr('à venda', 'for sale')}</small>` : `<select data-set="crop" data-i="${i}">${l.crops.map(c =>
                 `<option value="${c}"${c === x.crop ? ' selected' : ''}>${A.CROPS[c].n}</option>`).join('')}</select>
                 ${farm ? `<label class="check"><input type="checkbox" data-act="agro-ins" data-i="${i}"${x.insured ? ' checked' : ''}> ${tr('seguro rural', 'crop insurance')}</label>` : ''}
-                ${A.operated(x) ? (x.mgr ? `<br><small class="muted">${tr('com gerente agrícola', 'with a farm manager')}</small>`
+                ${A.operated(x) ? (x.mgr ? `<br><small class="muted">${tr('com gerente agrícola', 'with a farm manager')}</small>
+                  <button data-act="agro-fire" data-i="${i}" id="b-af-${i}">${tr('Demitir', 'Fire')} <small id="t-x-${i}"></small></button>`
                   : S.research.gestao_pessoas ? `<br><button data-act="agro-hire" data-i="${i}">${tr('Contratar gerente <small>12% do lucro</small>', 'Hire a manager <small>12% of profit</small>')}</button>`
                   : `<br><small class="muted">${tr(`consome ${l.energy} de energia/dia`, `drains ${l.energy} energy/day`)}</small>`) : ''}`}</td>
               <td>${x.selling ? '' : `<button data-act="agro-sell" data-i="${i}">${tr('Vender', 'Sell')}</button>`}</td></tr>`;
@@ -1578,6 +1606,12 @@
         S.agro.lands.forEach((x, i) => {
           const v = A.value(S, x);
           set(`t-v-${i}`, f.money(v));
+          if (x.mgr) {
+            const sev = A.severance(S, x);
+            set(`t-x-${i}`, tr(`rescisão ${f.money(sev)}`, `severance ${f.money(sev)}`));
+            dis(`b-af-${i}`, S.cash < sev);
+            why(`b-af-${i}`, need(S, { cash: sev }));
+          }
           const pl = $(`t-pl-${i}`);
           if (pl) {
             pl.textContent = `${f.signedPct(v / x.cost - 1, 1)} ${tr('desde a compra', 'since purchase')}`;
@@ -1617,7 +1651,11 @@
           h += `<section class="card"><h3>${tr('Seus imóveis', 'Your properties')}</h3><table class="tbl">`;
           S.realty.forEach((x, i) => {
             h += `<tr><td>${R.prop(x.pid).n}<br><small class="muted" id="rh-s-${i}"></small></td>
-              <td><b id="rh-v-${i}"></b><br><small id="rh-pl-${i}"></small></td><td><small id="rh-l-${i}"></small></td>
+              <td><b id="rh-v-${i}"></b><br><small id="rh-pl-${i}"></small></td><td><small id="rh-l-${i}"></small>${x.loan && !x.selling ? `
+                <br><input id="rh-in-${i}" inputmode="decimal" size="10" placeholder="${tr('valor em R$', 'amount in R$')}">
+                <button data-act="re-prepay" data-i="${i}" data-mode="pmt" id="b-rp-${i}">${tr('Amortizar ↓ parcela', 'Prepay ↓ payment')}</button>
+                <button data-act="re-prepay" data-i="${i}" data-mode="term" id="b-rt-${i}">${tr('Amortizar ↓ prazo', 'Prepay ↓ term')}</button>
+                <button data-act="re-payoff" data-i="${i}" id="b-rq-${i}">${tr('Quitar', 'Pay off')}</button>` : ''}</td>
               <td>${x.selling ? '' : `<button data-act="re-sell" data-i="${i}">${tr('Vender', 'Sell')}</button>`}
                 ${x.home ? `<br><small class="good">${tr('você mora aqui', 'you live here')}</small>` : !x.selling && !x.occupied && R.prop(x.pid).people ? `<br><button data-act="home" data-i="${i}" id="b-home-${i}">${tr('Morar aqui', 'Live here')}</button>` : ''}</td></tr>`;
           });
@@ -1660,6 +1698,12 @@
           }
           set(`rh-l-${i}`, x.loan ? tr(`saldo devedor ${f.money(x.loan.bal)} · parcela ${f.money(x.loan.pmt)} · ${x.loan.left} meses`,
             `balance ${f.money(x.loan.bal)} · payment ${f.money(x.loan.pmt)} · ${x.loan.left} months`) : tr('quitado', 'paid off'));
+          if (x.loan) {
+            dis(`b-rp-${i}`, S.cash <= 0);
+            dis(`b-rt-${i}`, S.cash <= 0);
+            dis(`b-rq-${i}`, S.cash < x.loan.bal);
+            why(`b-rq-${i}`, need(S, { cash: x.loan.bal }));
+          }
         });
       },
     },
@@ -2147,7 +2191,7 @@
     const input = () => parseMoney(($(`a-in-${id}`) || {}).value || '');
     const clearInput = x => { const el = $(`a-in-${x}`); if (el) el.value = ''; };
     const BLIND = ['buy', 'buymax', 'buyfrac', 'sell', 'sellall', 'sellfrac', 're-buy', 're-fin', 're-sell', 'angel', 'biz-open', 'biz-sell', 'biz-fin',
-      'biz-hire', 'agro-buy', 'agro-sell', 'agro-hire', 'agro-ins', 'fund-open', 'fund-sell', 'col-buy', 'col-sell', 'home', 'second-buy', 'second-sell'];
+      'biz-hire', 'biz-fire', 'biz-prepay', 'biz-payoff', 're-prepay', 're-payoff', 'agro-buy', 'agro-sell', 'agro-hire', 'agro-fire', 'agro-ins', 'fund-open', 'fund-sell', 'col-buy', 'col-sell', 'home', 'second-buy', 'second-sell'];
     if (BLIND.includes(b.dataset.act) && G.politics.blind(S)) {
       G.news(BLIND_MSG, 'info');
       render();
@@ -2175,6 +2219,7 @@
       case 're-buy': G.realty.buy(S, id, false); break;
       case 'agro-buy': G.agro.buy(S, id); break;
       case 'agro-hire': G.agro.hire(S, +b.dataset.i); break;
+      case 'agro-fire': G.agro.fire(S, +b.dataset.i); break;
       case 'agro-ins': G.agro.toggleInsurance(S, +b.dataset.i); break;
       case 'agro-sell': G.agro.sell(S, +b.dataset.i); break;
       case 're-fin': G.realty.buy(S, id, true); break;
@@ -2257,6 +2302,19 @@
       case 'biz-open': G.business.open(S, id); break;
       case 'biz-fin': G.business.open(S, id, true); break;
       case 'biz-hire': G.business.hire(S, id); break;
+      case 'biz-fire': G.business.fire(S, id); break;
+      case 'biz-prepay': {
+        const el = $(`bl-in-${b.dataset.i}`), amt = parseMoney((el || {}).value || '');
+        if (amt > 0 && G.business.prepay(S, +b.dataset.i, amt, b.dataset.mode)) el.value = '';
+        break;
+      }
+      case 'biz-payoff': { const l = G.business.loans(S)[+b.dataset.i]; if (l) G.business.prepay(S, +b.dataset.i, l.bal); break; }
+      case 're-prepay': {
+        const el = $(`rh-in-${b.dataset.i}`), amt = parseMoney((el || {}).value || '');
+        if (amt > 0 && G.realty.prepay(S, +b.dataset.i, amt, b.dataset.mode)) el.value = '';
+        break;
+      }
+      case 're-payoff': { const h = S.realty[+b.dataset.i]; if (h && h.loan) G.realty.prepay(S, +b.dataset.i, h.loan.bal); break; }
       case 'biz-sell': G.business.sell(S, id); break;
       case 'fund-open': G.fund.open(S); break;
       case 'fund-sell':

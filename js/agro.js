@@ -105,6 +105,15 @@
       const h = S.agro.lands[i];
       if (h && S.research.gestao_pessoas) h.mgr = true;
     },
+    // Rescisão: três meses da comissão sobre o lucro típico da terra (~7% do valor ao ano).
+    severance: (S, h) => 3 * MANAGER_FEE * (A.value(S, h) * 0.07) / 12,
+    fire(S, i) {
+      const h = S.agro.lands[i], cost = h && A.severance(S, h);
+      if (!h || !h.mgr || S.cash < cost) return;
+      S.cash -= cost;
+      h.mgr = false;
+      G.news(tr(`Você demitiu o gerente de ${land(h.id).n}. Rescisão: ${money(cost)}.`, `You fired the manager of ${land(h.id).n}. Severance: ${money(cost)}.`), 'info');
+    },
     toggleInsurance(S, i) {
       const h = S.agro.lands[i];
       if (h) h.insured = !h.insured;

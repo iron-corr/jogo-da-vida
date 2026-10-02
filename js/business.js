@@ -108,6 +108,37 @@
       if (!S.research.gestao_pessoas || B.managers(S, id) >= B.count(S, id)) return;
       S.biz.mgr[id] = B.managers(S, id) + 1;
     },
+    // Rescisão: três meses da comissão do gerente sobre o lucro de uma unidade.
+    severance: (S, id) => 3 * MANAGER_FEE * Math.max(0, B.unitProfit(S, biz(id))),
+    fire(S, id) {
+      const b = biz(id), cost = b && B.severance(S, id);
+      if (!b || !B.managers(S, id) || S.cash < cost) return;
+      S.cash -= cost;
+      S.biz.mgr[id] = B.managers(S, id) - 1;
+      G.news(tr(`Você demitiu um gerente (${b.n.toLowerCase()}). Rescisão: ${money(cost)}. A unidade volta a depender da sua energia.`,
+        `You fired a manager (${b.n.toLowerCase()}). Severance: ${money(cost)}. The unit depends on your energy again.`), 'info');
+    },
+    // Amortização antecipada do empréstimo k: 'pmt' mantém o prazo (parcela cai), 'term' mantém a parcela (prazo cai).
+    prepay(S, k, amount, mode = 'pmt') {
+      const L = B.loans(S), l = L[k];
+      if (!l) return 0;
+      const amt = Math.min(amount > 0 ? amount : l.bal, l.bal, Math.max(0, S.cash));
+      if (amt <= 0) return 0;
+      const rate = S.macro.selic + l.spread, before = B.loanPayment(S, l), n = biz(l.id).n.toLowerCase();
+      S.cash -= amt;
+      l.bal -= amt;
+      if (l.bal < 1) {
+        L.splice(k, 1);
+        G.legacy.flag(S, 'quitado');
+        G.news(tr(`Você quitou antecipadamente o financiamento de ${n} (${money(amt)}).`, `You paid off the loan for the ${n} early (${money(amt)}).`), 'good');
+        return amt;
+      }
+      if (mode === 'term') l.left = Math.min(l.left, G.realty.termFor(l.bal, rate, before));
+      G.news(mode === 'term'
+        ? tr(`Amortização de ${money(amt)} (${n}): faltam ${l.left} meses.`, `Prepayment of ${money(amt)} (${n}): ${l.left} months left.`)
+        : tr(`Amortização de ${money(amt)} (${n}): parcela cai para ${money(B.loanPayment(S, l))}.`, `Prepayment of ${money(amt)} (${n}): payment drops to ${money(B.loanPayment(S, l))}.`), 'good');
+      return amt;
+    },
     sell(S, id) {
       const b = biz(id), n = B.count(S, id);
       if (!b || !n) return;

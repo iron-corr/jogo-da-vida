@@ -36,6 +36,41 @@
       const r = Math.pow(1 + annualRate, 1 / 12) - 1;
       return (balance * r) / (1 - Math.pow(1 + r, -months));
     },
+    // Meses para zerar o saldo pagando a parcela pmt (inverso da tabela Price).
+    termFor(balance, annualRate, pmt) {
+      const r = Math.pow(1 + annualRate, 1 / 12) - 1;
+      if (pmt <= balance * r) return Infinity;
+      return Math.max(1, Math.ceil(-Math.log(1 - (r * balance) / pmt) / Math.log(1 + r)));
+    },
+    // Amortização antecipada: abate o saldo e reduz a parcela (mode 'pmt', mesmo prazo) ou o prazo (mode 'term', mesma parcela).
+    // Sem valor (ou valor acima do saldo), quita tudo o que o caixa cobrir.
+    prepay(S, i, amount, mode = 'pmt') {
+      const h = S.realty[i], l = h && h.loan;
+      if (!l || h.selling) return 0;
+      const amt = Math.min(amount > 0 ? amount : l.bal, l.bal, Math.max(0, S.cash));
+      if (amt <= 0) return 0;
+      S.cash -= amt;
+      l.bal -= amt;
+      const p = prop(h.pid);
+      if (l.bal < 1) {
+        h.loan = null;
+        G.legacy.flag(S, 'quitado');
+        G.news(tr(`Você quitou antecipadamente o financiamento: ${p.n.toLowerCase()} agora é 100% seu (${money(amt)}).`,
+          `You paid off the mortgage early: the ${p.n.toLowerCase()} is now 100% yours (${money(amt)}).`), 'good');
+        return amt;
+      }
+      if (mode === 'term') {
+        l.left = Math.min(l.left, R.termFor(l.bal, l.rate, l.pmt));
+        l.pmt = R.payment(l.bal, l.rate, l.left);
+        G.news(tr(`Amortização de ${money(amt)} (${p.n.toLowerCase()}): faltam ${l.left} meses, parcela de ${money(l.pmt)}.`,
+          `Prepayment of ${money(amt)} (${p.n.toLowerCase()}): ${l.left} months left, payment of ${money(l.pmt)}.`), 'good');
+      } else {
+        l.pmt = R.payment(l.bal, l.rate, l.left);
+        G.news(tr(`Amortização de ${money(amt)} (${p.n.toLowerCase()}): parcela cai para ${money(l.pmt)}.`,
+          `Prepayment of ${money(amt)} (${p.n.toLowerCase()}): payment drops to ${money(l.pmt)}.`), 'good');
+      }
+      return amt;
+    },
     quote(S, p, financed) {
       const price = R.price(S, p);
       if (!financed) return { upfront: price * (1 + ITBI), loan: 0, pmt: 0 };

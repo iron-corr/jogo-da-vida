@@ -599,5 +599,53 @@ S.knowledge = 1e4; S.reputation = 1e3; S.tabs.conhecimento = true;
 eq('aviso na aba Trabalho quando dá para promover', (G.goals.badges(S).trabalho || []).length, 1);
 eq('patrimônio: próximo marco em reais de 2026', /^R\$ 1,00 mi em reais de 2026/.test(goal67(S, 'patrimonio').text) ? 1 : 0, 1);
 
+// 68) demitir gerente: volta a drenar energia, deixa de pagar a comissão, cobra rescisão
+S = G.newState(68); S.research = { empreendedorismo: 1, gestao_pessoas: 1 }; S.cash = 1e6; S.macro.regime = 'expansao';
+G.business.open(S, 'padaria'); G.business.hire(S, 'padaria');
+const drain68 = G.business.drain(S), prof68 = G.business.monthlyProfit(S), sev68 = G.business.severance(S, 'padaria');
+cash0 = S.cash; G.business.fire(S, 'padaria');
+eq('demitir: sem gerente', G.business.managers(S, 'padaria'), 0);
+eq('demitir: volta a drenar energia', G.business.drain(S) - drain68, 3);
+eq('demitir: lucro sem a comissão de 15%', G.business.monthlyProfit(S) > prof68 ? 1 : 0, 1);
+eq('demitir: rescisão de 3 meses da comissão', cash0 - S.cash, sev68);
+eq('rescisão = 3 × 15% do lucro da unidade', sev68, 3 * 0.15 * G.business.unitProfit(S, G.business.biz('padaria')));
+cash0 = S.cash; G.business.fire(S, 'padaria'); eq('sem gerente, demitir não faz nada', cash0 - S.cash, 0);
+S.research.agro = 1; S.cash = 1e8; G.agro.buy(S, G.agro.LANDS[0].id); G.agro.hire(S, 0);
+const sev68b = G.agro.severance(S, S.agro.lands[0]); cash0 = S.cash; G.agro.fire(S, 0);
+eq('demitir gerente agrícola', S.agro.lands[0].mgr ? 1 : 0, 0);
+eq('rescisão agrícola', cash0 - S.cash, sev68b);
+
+// 69) amortização antecipada do imóvel: ↓ parcela (mesmo prazo), ↓ prazo (mesma parcela), quitar
+S = G.newState(69); S.research = { imoveis: 1, financiamento: 1 }; S.cash = 1e6; S.market.prices.imob = 100;
+G.realty.buy(S, 'apto', true);
+const L69 = S.realty[0].loan, pmt69 = L69.pmt, bal69 = L69.bal;
+cash0 = S.cash; G.realty.prepay(S, 0, 100000, 'pmt');
+eq('amortizar: saldo cai', bal69 - L69.bal, 100000);
+eq('amortizar: caixa cai', cash0 - S.cash, 100000);
+eq('↓ parcela: mesmo prazo', L69.left, 360);
+eq('↓ parcela: nova parcela Price', L69.pmt, G.realty.payment(bal69 - 100000, L69.rate, 360));
+const pmt69b = L69.pmt; G.realty.prepay(S, 0, 50000, 'term');
+eq('↓ prazo: prazo menor', L69.left < 360 ? 1 : 0, 1);
+eq('↓ prazo: parcela não sobe', L69.pmt <= pmt69b + 0.01 ? 1 : 0, 1);
+eq('↓ prazo: parcela quase igual', Math.abs(L69.pmt - pmt69b) < pmt69b * 0.02 ? 1 : 0, 1);
+S.cash = 1000; G.realty.prepay(S, 0, 1e9, 'pmt'); eq('valor limitado ao caixa', S.cash, 0);
+S.cash = 1e6; G.realty.prepay(S, 0, S.realty[0].loan.bal);
+eq('quitar: sem financiamento', S.realty[0].loan ? 1 : 0, 0);
+eq('quitar: conquista de dívida quitada', S.legacy.ach.quitado !== undefined || (S.flags && S.flags.quitado) ? 1 : 0, 1);
+eq('patrimônio em imóveis = valor de mercado', G.realty.equity(S), G.realty.value(S, S.realty[0]));
+
+// 70) amortização antecipada de empréstimo empresarial
+S = G.newState(70); S.research = { empreendedorismo: 1 }; S.cash = 10e6; S.macro.selic = 0.1;
+G.business.open(S, 'fabrica', true);
+const p70 = G.business.monthlyPayments(S);
+G.business.prepay(S, 0, 4e6, 'pmt');
+eq('empresa: dívida cai', G.business.debt(S), 10e6);
+eq('empresa ↓ parcela', G.business.monthlyPayments(S), G.realty.payment(10e6, 0.15, 120));
+const p70b = G.business.monthlyPayments(S); S.cash = 20e6; G.business.prepay(S, 0, 2e6, 'term');
+eq('empresa ↓ prazo: menos meses', G.business.loans(S)[0].left < 120 ? 1 : 0, 1);
+eq('empresa ↓ prazo: parcela não sobe', G.business.monthlyPayments(S) <= p70b + 0.01 ? 1 : 0, 1);
+eq('empresa: parcela menor que a original', G.business.monthlyPayments(S) < p70 ? 1 : 0, 1);
+G.business.prepay(S, 0, G.business.debt(S)); eq('empresa: quitado sai da lista', G.business.loans(S).length, 0);
+
 console.log(ok ? '\nTODOS OK' : '\nHÁ FALHAS');
 process.exitCode = ok ? 0 : 1;
