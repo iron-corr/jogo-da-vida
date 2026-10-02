@@ -5,6 +5,10 @@
   // Legado: idade, sucessão, Pontos de Legado (PL), melhorias permanentes e conquistas.
   // O mundo (data, macro, mercado) continua entre gerações; o jogador recomeça como estagiário.
   const START_AGE = 22, HEIR_AGE = 60;
+  // Aposentar-se passa o bastão em vida: o herdeiro recebe metade da parte dele agora (doação, com ITCMD) e a outra
+  // metade fica com a geração aposentada, rendendo 3% reais ao ano e pagando o custo de vida dela (60% do último);
+  // quando ela morre, o que sobrou vira herança (de novo com ITCMD). Morrer em atividade passa tudo de uma vez.
+  const ADVANCE = 0.5, ITCMD = 0.08, ELDER_REAL = 0.03, ELDER_COST = 0.6;
   const money = v => G.fmt.money(v);
 
   // Melhorias: custo em PL por nível.
@@ -35,6 +39,7 @@
   const SURNAME = [0, 0.2, 0.35, 0.5];
 
   const nw = S => G.portfolio.netWorth(S);
+  const f1 = days => G.fmt.num(days / 360, 0);
   const real = S => nw(S) / S.macro.priceIndex;
   const flag = (S, id) => !!(S.flags && S.flags[id]);
 
@@ -69,14 +74,20 @@
     { id: 'mercado', n: tr('Você é o mercado', 'You are the market'), d: tr('Comprar a bolsa de valores.', 'Buy the stock exchange.'), ok: S => G.business.count(S, 'bolsa') > 0 },
     { id: 'vida_plena', n: tr('Vida plena', 'A full life'), d: tr('Manter bem-estar médio de 75 por pelo menos 10 anos.', 'Keep an average well-being of 75 for at least 10 years.'), ok: S => S.life.wellN >= 120 && G.life.avgWell(S) >= 75 },
     { id: 'mundo', n: tr('Cidadão do mundo', 'Citizen of the world'), d: tr('Visitar todos os destinos de férias.', 'Visit every vacation destination.'), ok: S => G.life.DESTINATIONS.every(d => S.life.bucket[d.id]) },
+    { id: 'top10', n: tr('Na lista', 'On the list'), d: tr('Entrar no ranking das dez famílias mais ricas do país.', 'Break into the ranking of the country\'s ten richest families.'),
+      ok: S => !!S.fam && G.families.myRank(S) <= 10 },
+    { id: 'mais_rico', n: tr('Número um', 'Number one'), d: tr('Ser a família mais rica do país.', 'Be the richest family in the country.'), ok: S => !!S.fam && G.families.myRank(S) === 1 },
+    { id: 'presidente', n: tr('Presidente', 'President'), d: tr('Ser eleito Presidente da República.', 'Be elected President of the Republic.'), ok: S => flag(S, 'presidente') },
+    { id: 'superpotencia', n: tr('Superpotência', 'Superpower'), d: tr('Transformar o Brasil numa superpotência mundial.', 'Turn Brazil into a world superpower.'), ok: S => flag(S, 'superpotencia') },
     { id: 'sabatico', n: tr('Respirar', 'Breathe'), d: tr('Tirar um ano sabático.', 'Take a sabbatical year.'), ok: S => S.job.lastSabbatical !== undefined && S.job.lastSabbatical !== null },
   ];
 
   const LG = G.legacy = {
-    UPGRADES, ACHIEVEMENTS, HEIR_AGE,
-    init: () => ({ lp: 0, up: {}, generation: 1, history: [], ach: {} }),
+    UPGRADES, ACHIEVEMENTS, HEIR_AGE, ADVANCE,
+    init: () => ({ lp: 0, up: {}, generation: 1, history: [], ach: {}, elders: [] }),
     level: (S, id) => S.legacy.up[id] || 0,
-    age: S => START_AGE + (S.day - S.birthDay) / 360,
+    // ageOffset: o herdeiro assume com a idade real dele (0 = 22 anos no dia em que assumiu).
+    age: S => START_AGE + (S.ageOffset || 0) + (S.day - S.birthDay) / 360,
     rollLifespan: S => START_AGE + G.rng.int(56, 70),
     lifespan: S => S.lifespan + 3 * LG.level(S, 'longevidade'),
     health(S) {
@@ -115,23 +126,51 @@
     },
 
     // Passa o bastão: o herdeiro recomeça no mesmo mundo, com o que o legado permitir.
+    // Quanto o herdeiro recebe agora e quanto fica com a geração que se aposenta.
+    handover(S, reason) {
+      if (S.social.family.kids <= 0) return { now: 0, kept: 0 };
+      const part = Math.max(0, nw(S)) * LG.heirShare(S);
+      return reason === 'morte' ? { now: part * (1 - ITCMD), kept: 0 } : { now: part * ADVANCE * (1 - ITCMD), kept: part * (1 - ADVANCE) };
+    },
+    elders: S => S.legacy.elders || (S.legacy.elders = []),
     succeed(S, reason) {
       const L = S.legacy, gained = LG.points(S), heirs = S.social.family.kids > 0;
-      const inheritance = heirs ? Math.max(0, nw(S)) * LG.heirShare(S) * 0.92 : 0;
+      const hand = LG.handover(S, reason), inheritance = hand.now;
+      if (hand.kept > 0) {
+        LG.elders(S).push({
+          gen: L.generation, name: S.me ? S.me.name : '', spouse: S.social.family.married ? S.social.family.spouse : null, age: LG.age(S), since: S.day, estate: hand.kept,
+          dies: S.day + Math.max(30, Math.round((LG.lifespan(S) - LG.age(S)) * 360)),
+          cost: (G.work.cost(S) / S.macro.priceIndex) * ELDER_COST,
+        });
+      }
       L.lp += gained;
       L.history.push({
-        gen: L.generation, from: G.cal.of(S.birthDay).year, to: G.cal.of(S.day).year, age: Math.floor(LG.age(S)),
+        gen: L.generation, name: S.me ? S.me.name : '', from: G.cal.of(S.birthDay).year, to: G.cal.of(S.day).year, age: Math.floor(LG.age(S)),
         nw: real(S), lp: gained, reason,
       });
+      if (S.nation && S.nation.president) {
+        G.nation.leave(S, reason === 'morte' ? tr('O presidente morreu; o vice assume.', 'The president died; the vice president takes over.')
+          : tr('Você renunciou à Presidência para passar o bastão.', 'You resigned the Presidency to pass the torch.'));
+      }
+      if (S.nation) S.nation.campaign = null;
       const next = G.newState(S.rng);
-      Object.assign(next, { day: S.day, macro: S.macro, market: S.market, rng: S.rng, birthDay: S.day, speed: S.speed });
+      // O mundo continua: data, economia, mercado, famílias rivais e o país.
+      Object.assign(next, { day: S.day, macro: S.macro, market: S.market, rng: S.rng, birthDay: S.day, speed: S.speed, fam: S.fam, nation: S.nation });
       // O herdeiro mantém a estratégia e as preferências (alvos, robô, piloto, dicas...).
       next.auto = S.auto;
       next.routine = S.routine;
       next.settings = S.settings;
       next.legacy = L;
+      // O herdeiro escolhido (aba Dinastia) assume com a idade real e o que aprendeu; os irmãos viram parentes.
+      const heir = heirs ? G.dynasty.heir(S) : null;
+      if (heir) {
+        G.dynasty.passOn(S, heir);
+        next.me = { name: heir.name };
+        next.ageOffset = Math.max(18, G.dynasty.age(S, heir)) - START_AGE;
+        G.dynasty.applyHeir(next, heir);
+      }
       L.generation++;
-      next.lifespan = next.baseLifespan = LG.rollLifespan(next);
+      next.lifespan = next.baseLifespan = Math.max(LG.rollLifespan(next), LG.age(next) + 10);
       next.job.wageIndex = S.macro.priceIndex;
       next.cash = 300 * S.macro.priceIndex + inheritance;
       next.social.prestige = S.social.prestige * SURNAME[LG.level(S, 'sobrenome')];
@@ -145,8 +184,9 @@
       const age = Math.floor(LG.age(S));
       const why = reason === 'morte' ? tr(`Você morreu aos ${age} anos.`, `You died at age ${age}.`)
         : tr(`Você se aposentou aos ${age} anos e passou o bastão.`, `You retired at age ${age} and passed the torch.`);
-      G.news(tr(`${why} ${heirs ? `Seu herdeiro assume com ${money(inheritance)} de herança.` : 'Sem herdeiros, a fortuna foi para uma fundação.'} +${gained} pontos de legado. Começa a geração ${L.generation}.`,
-        `${why} ${heirs ? `Your heir takes over with an inheritance of ${money(inheritance)}.` : 'With no heirs, the fortune went to a foundation.'} +${gained} legacy points. Generation ${L.generation} begins.`), 'story');
+      const gift = hand.kept > 0;
+      G.news(tr(`${why} ${heirs ? `Seu herdeiro assume com ${money(inheritance)} ${gift ? 'de doação em vida' : 'de herança'}.` : 'Sem herdeiros, a fortuna foi para uma fundação.'} +${gained} pontos de legado. Começa a geração ${L.generation}.`,
+        `${why} ${heirs ? `Your heir takes over with ${money(inheritance)} ${gift ? 'as a lifetime gift' : 'in inheritance'}.` : 'With no heirs, the fortune went to a foundation.'} +${gained} legacy points. Generation ${L.generation} begins.`), 'story');
       const got = ACHIEVEMENTS.filter(a => L.ach[a.id] !== undefined && L.ach[a.id] >= S.birthDay).map(a => a.n);
       G.popup(next, tr(`Fim da ${L.generation - 1}ª geração`, `End of generation ${L.generation - 1}`), [
         why,
@@ -154,17 +194,46 @@
         [tr('Patrimônio final (R$ de 2026)', 'Final net worth (2026 R$)'), money(real(S))],
         [tr('Maior patrimônio', 'Peak net worth'), money(S.stats.peakNW || 0)],
         [tr('Pontos de legado ganhos', 'Legacy points earned'), `+${gained}`],
-        [tr('Herança', 'Inheritance'), heirs ? money(inheritance) : tr('nenhuma (sem filhos)', 'none (no children)')],
+        gift ? [tr('Doação em vida (agora)', 'Lifetime gift (now)'), money(inheritance)]
+          : [tr('Herança', 'Inheritance'), heirs ? money(inheritance) : tr('nenhuma (sem filhos)', 'none (no children)')],
+        ...(gift ? [[tr('Fica com a geração aposentada', 'Kept by the retired generation'), money(hand.kept)],
+          tr('A geração aposentada vive disso até morrer; o que sobrar vira herança, menos 8% de ITCMD.',
+            'The retired generation lives on it until death; whatever is left becomes an inheritance, minus 8% inheritance tax.')] : []),
         [tr('Conquistas desta vida', 'Achievements this life'), got.length ? got.join(', ') : tr('nenhuma', 'none')],
-        tr(`Começa a geração ${L.generation}: seu herdeiro tem 22 anos e começa como estagiário, no mesmo mundo.`,
-          `Generation ${L.generation} begins: your heir is 22 and starts as an intern, in the same world.`),
+        heir ? tr(`Começa a geração ${L.generation}: ${heir.name}, com ${Math.floor(LG.age(next))} anos, assume como ${G.work.CAREER[next.job.level].t}, no mesmo mundo.`,
+          `Generation ${L.generation} begins: ${heir.name}, age ${Math.floor(LG.age(next))}, takes over as ${G.work.CAREER[next.job.level].t}, in the same world.`)
+          : tr(`Começa a geração ${L.generation} com um parente distante, de 22 anos, como estagiário.`, `Generation ${L.generation} begins with a distant relative, age 22, as an intern.`),
       ]);
       if (G.ui && G.ui.reset) G.ui.reset();
       return next;
     },
 
+    // Gerações aposentadas: o patrimônio rende e paga o custo de vida; na morte, vira herança.
+    eldersMonthly(S) {
+      const list = LG.elders(S), pi = S.macro.priceIndex;
+      for (let i = list.length - 1; i >= 0; i--) {
+        const e = list[i];
+        e.estate = Math.max(0, e.estate * Math.pow((1 + S.macro.infl) * (1 + ELDER_REAL), 1 / 12) - e.cost * pi);
+        if (S.day < e.dies) continue;
+        list.splice(i, 1);
+        const age = Math.floor(e.age + (S.day - e.since) / 360), amount = e.estate * (1 - ITCMD);
+        S.cash += amount;
+        const h = S.legacy.history.find(x => x.gen === e.gen);
+        if (h) h.died = age;
+        G.news(tr(`A ${e.gen}ª geração morreu aos ${age} anos. Herança: ${money(amount)}, já descontados 8% de ITCMD.`,
+          `Generation ${e.gen} died at age ${age}. Inheritance: ${money(amount)}, after 8% inheritance tax.`), 'story');
+        G.popup(S, tr(`Morre a ${e.gen}ª geração`, `Generation ${e.gen} passes away`), [
+          tr(`Depois de ${f1(S.day - e.since)} anos aposentada, a ${e.gen}ª geração morreu aos ${age} anos.`,
+            `After ${f1(S.day - e.since)} years in retirement, generation ${e.gen} died at age ${age}.`),
+          [tr('Herança recebida', 'Inheritance received'), money(amount)],
+          [tr('ITCMD (8%)', 'Inheritance tax (8%)'), money(e.estate * ITCMD)],
+        ]);
+      }
+    },
+
     monthly(S, c) {
       LG.checkAchievements(S);
+      LG.eldersMonthly(S);
       if (c.month === 1) {
         if (S.social.stress > 70) S.lifespan -= 0.5;
         if (G.social.has(S, 'exercicio') && S.lifespan < S.baseLifespan + 5) S.lifespan += 0.2;

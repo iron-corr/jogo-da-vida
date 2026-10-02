@@ -16,6 +16,9 @@
     ['imoveis', tr('Imóveis', 'Real estate')],
     ['terras', tr('Terras', 'Land')],
     ['startups', 'Startups'],
+    ['dinastia', tr('Dinastia', 'Dynasty')],
+    ['familias', tr('Famílias', 'Families')],
+    ['brasil', tr('Brasil', 'Brazil')],
     ['legado', tr('Legado', 'Legacy')],
   ];
 
@@ -51,11 +54,11 @@
   };
   const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
 
-  // Aceita "1.500,50", "1500.5", "R$ 2 mil" não (só números). Em inglês, "1,500.50".
+  // Aceita "1.500,50", "400.000", "1500.5", "R$ 2 mil" não (só números). Em inglês, "1,500.50".
   function parseMoney(s) {
     s = String(s).replace(/[^\d,.]/g, '');
     if (G.EN) s = s.replace(/,/g, '');
-    else if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+    else if (s.includes(',') || /^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '').replace(',', '.'); // "400.000" = 400 mil
     return parseFloat(s) || 0;
   }
 
@@ -153,6 +156,64 @@
   }
 
 
+  // Por que um imóvel não serve de casa própria (vazio se serve).
+  function homeWhy(S, h) {
+    const p = G.realty.prop(h.pid), n = G.social.familySize(S);
+    switch (G.life.homeProblem(S, h)) {
+      case 'comercial': return tr('imóvel comercial: não dá para morar', 'commercial property: you can\'t live there');
+      case 'familia': return tr(`cabem ${p.people} pessoas e sua família tem ${n}`, `it fits ${p.people} people and your family has ${n}`);
+      case 'valor': return tr(`pequeno para o seu padrão de vida: precisa valer ${f.money(G.life.homeMin(S))}`, `too small for your lifestyle: must be worth ${f.money(G.life.homeMin(S))}`);
+    }
+    return '';
+  }
+
+  // Presidência da República (aba Poder): requisitos, candidatura, campanha e reeleição.
+  function presidencySection(S, opts) {
+    const N = G.nation, n = S.nation, P = G.macro.POLICIES;
+    let h = `<section class="card"><h3>${tr('Presidência da República', 'Presidency of the Republic')}</h3>`;
+    if (N.isPresident(S)) {
+      h += `<p class="good">${tr(`Você é o presidente (${n.president.term}º mandato, até ${f.monthYear(n.president.until)}). O governo fica na aba Brasil.`,
+        `You are the president (term ${n.president.term}, until ${f.monthYear(n.president.until)}). The government is in the Brazil tab.`)}</p>`;
+    }
+    if (n.campaign) {
+      h += `<p>${tr(`Em campanha pela plataforma <b>${P[n.campaign.platform].n}</b>, com ${f.money(n.campaign.budget)}.`,
+        `Campaigning on the <b>${P[n.campaign.platform].n}</b> platform, with ${f.money(n.campaign.budget)}.`)} <span id="pr-vote"></span></p>
+        <p class="muted">${tr('A eleição é em novembro: precisa de mais de 50% dos votos válidos no segundo turno. Debates e gafes de agosto a outubro mexem nas pesquisas.',
+          'The election is in November: you need more than 50% of the valid votes in the runoff. Debates and gaffes from August to October move the polls.')}</p>`;
+    } else if (!N.isPresident(S) || N.reelection(S)) {
+      if (!N.isPresident(S)) {
+        h += `<p class="muted">${tr('A eleição mais difícil do país. Requisitos para ser candidato:', 'The hardest election in the country. Requirements to run:')}</p><ul>` +
+          N.requirements(S).map((r, i) => `<li id="pr-q-${i}">${r.t}</li>`).join('') + '</ul>';
+      } else h += `<p>${tr('Você pode concorrer à reeleição. O resultado depende quase só da aprovação do governo.', 'You can run for reelection. The result depends almost entirely on your government\'s approval.')}</p>`;
+      h += `<p class="muted">${tr(`Candidaturas de janeiro a julho de ano eleitoral (próxima eleição: ${G.cal.nextElection(S.day)}). Custa 100 de influência e a verba de campanha;
+        acima de ${f.money(N.OFFICIAL_LIMIT * S.macro.priceIndex)} é caixa 2. Contam imagem, influência, posição social, dinheiro, mídia própria, famílias aliadas (e rivais) e a economia.`,
+        `Candidacies from January to July of an election year (next election: ${G.cal.nextElection(S.day)}). It costs 100 influence plus the campaign budget;
+        anything above ${f.money(N.OFFICIAL_LIMIT * S.macro.priceIndex)} is off the books. Image, influence, social status, money, your own media, allied (and rival) families and the economy all count.`)}</p>
+        <p>${N.reelection(S) ? '' : `${tr('Plataforma', 'Platform')} <select id="pr-side">${opts('moderado')}</select> `}
+        ${tr('Verba de campanha', 'Campaign budget')} <input id="pr-budget" inputmode="decimal" placeholder="${tr('valor em R$', 'amount in R$')}">
+        <button data-act="run" id="b-run">${N.reelection(S) ? tr('Concorrer à reeleição', 'Run for reelection') : tr('Lançar candidatura', 'Launch candidacy')}</button></p>`;
+    }
+    return h + '</section>';
+  }
+  function updatePresidency(S) {
+    const N = G.nation, n = S.nation;
+    if (n.campaign) {
+      const v = N.expectedVote(S);
+      set('pr-vote', tr(`Pesquisa: ~${f.pct(v, 0)} dos votos válidos (margem de 6 pontos).`, `Poll: ~${f.pct(v, 0)} of the valid votes (6-point margin).`));
+      return;
+    }
+    N.requirements(S).forEach((r, i) => {
+      const el = $(`pr-q-${i}`);
+      if (el) { set(`pr-q-${i}`, `${r.ok ? '✓' : '✗'} ${r.t}`); el.className = r.ok ? 'good' : 'bad'; }
+    });
+    const req = N.reelection(S) || N.requirements(S).every(r => r.ok);
+    dis('b-run', !N.canRun(S) || S.pol.influence < 100 || S.cash < N.minBudget(S));
+    why('b-run', !N.window(S) ? tr(`candidaturas só de janeiro a julho de ${G.cal.nextElection(S.day)}`, `candidacies only from January to July of ${G.cal.nextElection(S.day)}`)
+      : !req ? tr('faltam requisitos', 'requirements not met')
+      : S.pol.influence < 100 ? tr('precisa de 100 de influência', 'needs 100 influence')
+      : need(S, { cash: N.minBudget(S) }) || tr(`verba mínima de ${f.money(N.minBudget(S))}`, `minimum budget of ${f.money(N.minBudget(S))}`));
+  }
+
   // Explicações do painel lateral (aparecem ao passar o mouse).
   const TIPS = {
     cash: tr('Dinheiro parado na conta. Perde para a inflação; o que passar da reserva pode ir para investimentos.',
@@ -181,7 +242,8 @@
     sal: tr('Salário do cargo atual, reajustado pela inflação todo janeiro.', 'Salary of your current position, adjusted for inflation every January.'),
     yield: tr('Juros, dividendos e aluguéis de FIIs esperados por mês (sem contar a variação de preço).',
       'Interest, dividends and REIT rents expected per month (not counting price changes).'),
-    rent: tr('Aluguel líquido dos imóveis ocupados.', 'Net rent from occupied properties.'),
+    rent: tr('Aluguel líquido dos imóveis alugados, menos condomínio e IPTU dos vagos e da casa onde você mora.',
+      'Net rent from rented properties, minus building fees and property tax on vacant ones and on the home you live in.'),
     agro: tr('Arrendamentos e gado por mês. As safras de soja e café entram de uma vez na colheita.',
       'Land leases and cattle per month. Soy and coffee crops come in all at once at harvest.'),
     loan: tr('Parcelas dos financiamentos de imóveis (taxa fixa) e de empresas (acompanham a Selic).',
@@ -304,6 +366,9 @@
     { id: 'alvos', when: S => S.research.aporte_auto && !Object.values(S.auto.targets).some(v => v > 0),
       t: tr('Defina seus alvos em <b>Investimentos → Estratégia automática</b> e ligue o aporte automático.',
         'Set your targets in <b>Investments → Automatic strategy</b> and turn on automatic investing.') },
+    { id: 'apertado', when: S => G.work.crowded(S) > 0,
+      t: tr('Sua família não cabe mais onde você mora. Mude para um padrão maior em <b>Trabalho → Estilo de vida</b>: o aperto aumenta o stress e derruba o bem-estar.',
+        'Your family no longer fits where you live. Move up in <b>Work → Lifestyle</b>: cramped quarters raise stress and sink well-being.') },
     { id: 'habito', when: S => S.tabs.vida && !Object.keys(S.social.habits).length,
       t: tr('Na aba <b>Vida</b>, comece um hábito. Exercício e leitura se pagam rápido.', 'In the <b>Life</b> tab, start a habit. Exercise and reading pay off fast.') },
     { id: 'panico', when: S => S.social.pending && S.social.pending.type === 'panic',
@@ -414,7 +479,7 @@
             <table class="tbl">`;
           W.LIFESTYLE.forEach((l, i) => {
             const cur = i === S.lifestyle;
-            h += `<tr class="${cur ? 'cur' : ''}"><td>${l.n}</td><td id="ls-c-${i}"></td><td>${tr('energia', 'energy')} ${l.emax + bonusE}, +${l.regen}/${tr('dia', 'day')}</td>
+            h += `<tr class="${cur ? 'cur' : ''}"><td>${l.n}<br><small class="muted">${tr(`até ${l.people} ${l.people === 1 ? 'pessoa' : 'pessoas'}`, `up to ${l.people} ${l.people === 1 ? 'person' : 'people'}`)}</small></td><td id="ls-c-${i}"></td><td>${tr('energia', 'energy')} ${l.emax + bonusE}, +${l.regen}/${tr('dia', 'day')}</td>
               <td>${cur ? `<b>${tr('atual', 'current')}</b>` : `<button data-act="lifestyle" data-i="${i}" id="b-ls-${i}">${i > S.lifestyle ? tr('Mudar', 'Move') : tr('Reduzir', 'Downsize')}</button>`}</td></tr>`;
           });
           h += '</table>';
@@ -446,9 +511,10 @@
             dis(`b-city-${id}`, S.cash < LF.cityCost(S, id));
             why(`b-city-${id}`, need(S, { cash: LF.cityCost(S, id) }));
           }
-          set('w-home', LF.homeOk(S) ? tr('custo de vida −40%.', 'cost of living −40%.')
-            : tr(`pequeno para o padrão atual (precisa valer ${f.money(LF.homeMin(S))}), sem desconto no custo de vida.`,
-              `too small for your current lifestyle (must be worth ${f.money(LF.homeMin(S))}), no cost-of-living discount.`));
+          const upkeep = LF.home(S) ? G.realty.value(S, LF.home(S)) * G.realty.VACANT_COST : 0;
+          set('w-home', LF.homeOk(S) ? tr(`custo de vida −40% (${f.money(W.rentCost(S) - W.cost(S))}/mês); condomínio e IPTU: ${f.money(upkeep)}/mês.`,
+            `cost of living −40% (${f.money(W.rentCost(S) - W.cost(S))}/month); building fees and property tax: ${f.money(upkeep)}/month.`)
+            : LF.home(S) ? `${homeWhy(S, LF.home(S))}${tr(', sem desconto no custo de vida.', ', no cost-of-living discount.')}` : '');
         }
         set('w-sal', f.money(W.salary(S)));
         set('w-ot', '+' + f.money(W.otGain(S)));
@@ -462,8 +528,12 @@
         why('b-ot', need(S, { energy: W.OT_COST }));
         dis('b-study', !W.canAct(S, W.studyCost(S)));
         why('b-study', need(S, { energy: W.studyCost(S) }));
-        dis('b-search', !W.canAct(S, W.SEARCH_COST));
-        why('b-search', need(S, { energy: W.SEARCH_COST }));
+        const sb = W.searchBlock(S);
+        dis('b-search', !!sb || !W.canAct(S, W.SEARCH_COST));
+        why('b-search', sb === 'cedo' ? tr(`processos seletivos levam no mínimo 1 mês: respostas a partir de ${f.date(W.hireFrom(S))}`,
+          `hiring takes at least a month: answers from ${f.date(W.hireFrom(S))} on`)
+          : sb === 'hoje' ? tr('você já mandou currículos hoje; tente amanhã', 'you already sent out résumés today; try tomorrow')
+          : need(S, { energy: W.SEARCH_COST }));
         if (S.research.rotina) {
           // Estimativa do que o piloto faz por dia com a energia que sobra das empresas.
           const free = W.freeEnergy(S), r = S.routine;
@@ -487,9 +557,13 @@
         set('w-burn', tr(`Em burnout: mais ${S.burnout} dia(s) de descanso.`, `Burned out: ${S.burnout} more day(s) of rest.`));
         if (S.tabs.estilo) {
           W.LIFESTYLE.forEach((l, i) => {
-            set(`ls-c-${i}`, f.money(l.cost * S.macro.priceIndex * W.costMult(S)) + tr('/mês', '/month'));
-            dis(`b-ls-${i}`, S.cash < W.moveCost(S, i));
-            why(`b-ls-${i}`, need(S, { cash: W.moveCost(S, i) }));
+            const rentI = l.cost * S.macro.priceIndex * W.costMult(S), home = G.life.home(S), hp = home && G.realty.prop(home.pid);
+            const own = hp && hp.people >= G.social.familySize(S) && G.realty.value(S, home) >= G.life.HOME_MIN * rentI ? 1 - G.life.HOME_SHARE : 1;
+            set(`ls-c-${i}`, f.money(rentI * own) + tr('/mês', '/month'));
+            const small = i < S.lifestyle && !W.fits(S, i);
+            dis(`b-ls-${i}`, small || S.cash < W.moveCost(S, i));
+            why(`b-ls-${i}`, small ? tr(`sua família tem ${G.social.familySize(S)} pessoas; aqui cabem ${l.people}`,
+              `your family has ${G.social.familySize(S)} people; this fits ${l.people}`) : need(S, { cash: W.moveCost(S, i) }));
           });
         }
       },
@@ -858,7 +932,7 @@
             <button data-act="marry" data-id="1" id="b-m1">${tr('Casamento de revista', 'Society-page wedding')} <small id="v-m1"></small></button>`;
         } else h += `<button data-act="kid" id="b-kid">${tr('Ter um filho', 'Have a child')} <small id="v-kid"></small></button>`;
         if (f.kids) h += `<button data-act="school">${f.school ? tr('Tirar da escola particular', 'Leave private school') : tr('Escola particular', 'Private school')} <small id="v-sch"></small></button>`;
-        h += '</div><p id="v-kidst"></p></section>';
+        h += '</div><p id="v-kidst"></p><p id="v-house"></p></section>';
         return h;
       },
       update(S) {
@@ -913,6 +987,11 @@
           : ks === 'recovering' ? tr(`Recuperação do parto: dá para tentar outro filho em ~${months(fam.nextKid)} mês(es).`,
             `Recovering from the birth: you can try for another child in ~${months(fam.nextKid)} month(s).`) : '';
         set('v-kidst', fam.married || ks === 'pregnant' ? kidMsg : '');
+        const crowd = G.work.crowded(S), house = $('v-house');
+        set('v-house', tr(`Em casa: ${SO.familySize(S)} ${SO.familySize(S) === 1 ? 'pessoa' : 'pessoas'}; onde você mora cabem ${G.work.capacity(S)}.`,
+          `At home: ${SO.familySize(S)} ${SO.familySize(S) === 1 ? 'person' : 'people'}; where you live fits ${G.work.capacity(S)}.`) +
+          (crowd ? tr(' Apertado: mais stress e menos bem-estar. Mude em Trabalho → Estilo de vida.', ' Cramped: more stress and less well-being. Move in Work → Lifestyle.') : ''));
+        if (house) house.className = crowd ? 'bad' : 'muted';
         dis('b-kid', ks !== 'ready' || S.cash < SO.KID_COST * pi);
         why('b-m0', need(S, { cash: 60000 * pi }));
         why('b-m1', need(S, { cash: 800000 * pi }));
@@ -1077,7 +1156,8 @@
         const pol = S.pol;
         return [G.social.tierIdx(S), S.macro.policy, !!pol.poll, Object.keys(pol.backed).join(','), pol.bills.map(b => b.id).join(','),
           Object.keys(pol.passed).join(','), Object.keys(pol.media).join(','), pol.thinkTank ? pol.thinkTank.side : '', Object.keys(pol.entities).join(','),
-          pol.office ? pol.office.id : '', ['relacoes_institucionais', 'midia', 'filantropia_estrategica', 'economia_politica'].map(r => +!!S.research[r]).join('')].join('|');
+          pol.office ? pol.office.id : '', ['relacoes_institucionais', 'midia', 'filantropia_estrategica', 'economia_politica'].map(r => +!!S.research[r]).join(''),
+          G.nation.isPresident(S), !!S.nation.campaign, G.nation.window(S), G.nation.reelection(S)].join('|');
       },
       build(S) {
         const PL = G.politics, pol = S.pol, P = G.macro.POLICIES, t = G.social.tierIdx(S);
@@ -1173,7 +1253,7 @@
           h += '</td></tr>';
         }
         h += '</table></section>';
-        return h;
+        return h + presidencySection(S, opts);
       },
       update(S) {
         const PL = G.politics, pol = S.pol;
@@ -1209,13 +1289,15 @@
             : G.social.tierIdx(S) < o.tier ? tr(`requer posição ${G.social.TIERS[o.tier][1]}`, `requires ${G.social.TIERS[o.tier][1]} status`)
             : o.access && !pol.access ? tr('precisa ter apoiado o governo eleito', 'you must have backed the elected government') : '');
         }
+        updatePresidency(S);
       },
     },
 
     legado: {
       key(S) {
         const L = S.legacy;
-        return [L.generation, Object.keys(L.ach).length, JSON.stringify(L.up), S.social.family.kids > 0, G.legacy.age(S) >= G.legacy.HEIR_AGE].join('|');
+        return [L.generation, Object.keys(L.ach).length, JSON.stringify(L.up), S.social.family.kids > 0, G.legacy.age(S) >= G.legacy.HEIR_AGE,
+          G.legacy.elders(S).length, L.history.map(g => g.died || '').join()].join('|');
       },
       build(S) {
         const LG = G.legacy, L = S.legacy;
@@ -1225,16 +1307,23 @@
           <p>Se passasse o bastão hoje: <b id="l-gain"></b> pontos de legado
           <span class="muted">(raiz do patrimônio real + prestígio + bem-estar da vida; sem filhos, a fortuna vai para uma fundação e metade se perde)</span>.</p>
           <p>Bem-estar médio desta vida: <b id="l-well"></b> <span class="muted">(acima de 40, cada ponto rende legado; hoje vale <span id="l-wellpts"></span> pontos)</span></p>
-          <p>Seu herdeiro receberia <b id="l-heir"></b> <span class="muted">(${G.fmt.pct(LG.heirShare(S), 0)} do patrimônio, menos 8% de ITCMD)</span>
-          e recomeçaria como estagiário, no mesmo mundo e no mesmo ano.</p>`,
+          <p>Se você morrer, seu herdeiro recebe <b id="l-heir"></b> de uma vez <span class="muted">(${G.fmt.pct(LG.heirShare(S), 0)} do patrimônio, menos 8% de ITCMD)</span>.
+          Se você se aposentar, ele recebe <b id="l-gift"></b> agora, como doação em vida, e <b id="l-kept"></b> ficam com você: rendem, pagam seu custo de vida
+          e o que sobrar vira herança quando você morrer. Nos dois casos, o herdeiro escolhido na aba Dinastia assume com a idade e as habilidades que tem, no mesmo mundo e no mesmo ano.</p>`,
           `<section class="card summary"><span>Generation <b>${L.generation}</b></span><span>Age <b id="l-age"></b></span>
           <span>Health <b id="l-health"></b></span><span>Legacy points <b id="l-lp"></b></span></section>
           <section class="card"><h3>Succession</h3>
           <p>If you passed the torch today: <b id="l-gain"></b> legacy points
           <span class="muted">(square root of real net worth + prestige + lifetime well-being; without children, the fortune goes to a foundation and half is lost)</span>.</p>
           <p>Average well-being this life: <b id="l-well"></b> <span class="muted">(above 40, each point earns legacy; currently worth <span id="l-wellpts"></span> points)</span></p>
-          <p>Your heir would receive <b id="l-heir"></b> <span class="muted">(${G.fmt.pct(LG.heirShare(S), 0)} of net worth, minus 8% inheritance tax)</span>
-          and would start over as an intern, in the same world and the same year.</p>`);
+          <p>If you die, your heir receives <b id="l-heir"></b> all at once <span class="muted">(${G.fmt.pct(LG.heirShare(S), 0)} of net worth, minus 8% inheritance tax)</span>.
+          If you retire, they receive <b id="l-gift"></b> now, as a lifetime gift, and <b id="l-kept"></b> stay with you: it earns returns, pays your cost of living
+          and whatever is left becomes an inheritance when you die. Either way, the heir chosen in the Dynasty tab takes over at their age and with their skills, in the same world and the same year.</p>`);
+        const elders = LG.elders(S);
+        if (elders.length) {
+          h += `<p>${tr('Gerações anteriores vivas', 'Living previous generations')}:</p><ul>` + elders.map((e, i) =>
+            `<li>${e.name ? `${esc(e.name)}, ` : ''}${tr(`${e.gen}ª geração, aposentada`, `generation ${e.gen}, retired`)}: <span id="l-el-${i}"></span></li>`).join('') + '</ul>';
+        }
         if (S.social.family.kids === 0) h += tr('<p class="bad">Você ainda não tem filhos (aba Vida → Família).</p>', '<p class="bad">You have no children yet (Life tab → Family).</p>');
         h += LG.age(S) >= LG.HEIR_AGE
           ? `<button data-act="succeed">${tr('Aposentar e passar o bastão', 'Retire and pass the torch')}</button>`
@@ -1253,7 +1342,8 @@
           <tr><td>Lucro da gestora</td><td id="st-fund"></td><td>Retorno de startups</td><td id="st-angel"></td></tr>
           <tr><td>IR pago</td><td id="st-tax"></td><td>Doado</td><td id="st-don"></td></tr></table>
           <p class="muted">Valores nominais somados ao longo da vida. <button class="link" data-act="hints-on">Religar dicas do tutorial</button></p>
-          <p><label class="check"><input type="checkbox" data-act="retro-toggle" id="l-retro"> Mostrar a retrospectiva de cada ano (em janeiro)</label></p></section>
+          <p><label class="check"><input type="checkbox" data-act="retro-toggle" id="l-retro"> Mostrar a retrospectiva de cada ano (em janeiro)</label></p>
+          <p><label class="check"><input type="checkbox" data-act="badges-toggle" id="l-badges"> Marcar com • as abas que têm algo a fazer</label></p></section>
           <section class="card"><h3>Conquistas <small>${Object.keys(L.ach).length}/${LG.ACHIEVEMENTS.length} · +3 pontos cada</small></h3><table class="tbl">`,
           `</table></section><section class="card"><h3>Stats for this life</h3><table class="tbl stats">
           <tr><td>Years lived in the game</td><td id="st-years"></td><td>Peak net worth</td><td id="st-peak"></td></tr>
@@ -1262,7 +1352,8 @@
           <tr><td>Asset manager profit</td><td id="st-fund"></td><td>Startup returns</td><td id="st-angel"></td></tr>
           <tr><td>Income tax paid</td><td id="st-tax"></td><td>Donated</td><td id="st-don"></td></tr></table>
           <p class="muted">Nominal amounts summed over the lifetime. <button class="link" data-act="hints-on">Turn tutorial tips back on</button></p>
-          <p><label class="check"><input type="checkbox" data-act="retro-toggle" id="l-retro"> Show each year's review (in January)</label></p></section>
+          <p><label class="check"><input type="checkbox" data-act="retro-toggle" id="l-retro"> Show each year's review (in January)</label></p>
+          <p><label class="check"><input type="checkbox" data-act="badges-toggle" id="l-badges"> Mark tabs that have something to do with •</label></p></section>
           <section class="card"><h3>Achievements <small>${Object.keys(L.ach).length}/${LG.ACHIEVEMENTS.length} · +3 points each</small></h3><table class="tbl">`);
         for (const a of LG.ACHIEVEMENTS) {
           const got = L.ach[a.id] !== undefined;
@@ -1270,10 +1361,12 @@
         }
         h += '</table></section>';
         if (L.history.length) {
-          h += tr('<section class="card"><h3>Dinastia</h3><table class="tbl"><tr><td><b>Geração</b></td><td><b>Anos</b></td><td><b>Patrimônio final (R$ de 2026)</b></td><td><b>Pontos</b></td></tr>',
-            '<section class="card"><h3>Dynasty</h3><table class="tbl"><tr><td><b>Generation</b></td><td><b>Years</b></td><td><b>Final net worth (2026 R$)</b></td><td><b>Points</b></td></tr>');
+          h += tr('<section class="card"><h3>Gerações</h3><table class="tbl"><tr><td><b>Geração</b></td><td><b>Anos</b></td><td><b>Patrimônio final (R$ de 2026)</b></td><td><b>Pontos</b></td></tr>',
+            '<section class="card"><h3>Generations</h3><table class="tbl"><tr><td><b>Generation</b></td><td><b>Years</b></td><td><b>Final net worth (2026 R$)</b></td><td><b>Points</b></td></tr>');
           for (const g of L.history) {
-            h += `<tr><td>${tr(`${g.gen}ª`, `#${g.gen}`)}</td><td>${g.from}–${g.to} (${g.reason === 'morte' ? tr(`morreu aos ${g.age}`, `died at ${g.age}`) : tr(`aposentou aos ${g.age}`, `retired at ${g.age}`)})</td><td>${f.money(g.nw)}</td><td>+${g.lp}</td></tr>`;
+            const fate = g.reason === 'morte' ? tr(`morreu aos ${g.age}`, `died at ${g.age}`)
+              : tr(`aposentou aos ${g.age}`, `retired at ${g.age}`) + (g.died ? tr(`, morreu aos ${g.died}`, `, died at ${g.died}`) : '');
+            h += `<tr><td>${tr(`${g.gen}ª`, `#${g.gen}`)}${g.name ? ` · ${esc(g.name)}` : ''}</td><td>${g.from}–${g.to} (${fate})</td><td>${f.money(g.nw)}</td><td>+${g.lp}</td></tr>`;
           }
           h += '</table></section>';
         }
@@ -1288,6 +1381,7 @@
         set('l-well', S.life.wellN ? f.num(G.life.avgWell(S), 0) : '—');
         set('l-wellpts', f.num(G.life.wellPoints(S)));
         $('l-retro').checked = S.settings.retro !== false;
+        $('l-badges').checked = S.settings.badges !== false;
         const st = S.stats;
         set('st-years', f.num((S.day - S.birthDay) / 360, 1));
         set('st-peak', f.money(st.peakNW || 0));
@@ -1299,7 +1393,12 @@
         set('st-angel', f.money(st.angelOut || 0));
         set('st-tax', f.money(S.tax.paid));
         set('st-don', f.money(S.social.donated));
-        set('l-heir', f.money(S.social.family.kids ? Math.max(0, G.portfolio.netWorth(S)) * LG.heirShare(S) * 0.92 : 0));
+        set('l-heir', f.money(LG.handover(S, 'morte').now));
+        const ret = LG.handover(S, 'aposentadoria');
+        set('l-gift', f.money(ret.now));
+        set('l-kept', f.money(ret.kept));
+        LG.elders(S).forEach((e, i) => set(`l-el-${i}`, tr(`${Math.floor(e.age + (S.day - e.since) / 360)} anos, patrimônio ${f.money(e.estate)}`,
+          `age ${Math.floor(e.age + (S.day - e.since) / 360)}, estate ${f.money(e.estate)}`)));
         for (const u of LG.UPGRADES) {
           const cost = LG.upgradeCost(S, u);
           dis(`b-lu-${u.id}`, cost === undefined || S.legacy.lp < cost);
@@ -1310,7 +1409,7 @@
 
     negocios: {
       key: S => [!!S.research.empreendedorismo, !!S.research.gestao_pessoas, !!S.research.gestora, !!S.fund,
-        G.BUSINESSES.map(b => G.business.count(S, b.id) > 0 ? 1 : 0).join(''), G.social.tierIdx(S)].join('|'),
+        G.BUSINESSES.map(b => G.business.count(S, b.id) > 0 ? 1 : 0).join(''), G.social.tierIdx(S), G.business.loans(S).map(l => l.id).join()].join('|'),
       build(S) {
         const B = G.business;
         let h = '';
@@ -1338,10 +1437,24 @@
               <td><span id="bz-u-${b.id}"></span>${tr('/mês cada', '/month each')}</td>
               <td class="ops"><button data-act="biz-open" data-id="${b.id}" id="b-bo-${b.id}">${tr('Abrir', 'Open')} <small id="bz-p-${b.id}"></small></button>
               <button data-act="biz-fin" data-id="${b.id}" id="b-bf-${b.id}">${tr('Financiar', 'Finance')} <small id="bz-f-${b.id}"></small></button>
-              ${S.research.gestao_pessoas ? `<button data-act="biz-hire" data-id="${b.id}" id="b-bh-${b.id}">${tr('Contratar gerente', 'Hire a manager')}</button>` : ''}
+              ${S.research.gestao_pessoas ? `<button data-act="biz-hire" data-id="${b.id}" id="b-bh-${b.id}">${tr('Contratar gerente', 'Hire a manager')}</button>
+              ${B.count(S, b.id) ? `<button data-act="biz-fire" data-id="${b.id}" id="b-bx-${b.id}">${tr('Demitir gerente', 'Fire a manager')} <small id="bz-x-${b.id}"></small></button>` : ''}` : ''}
               <button data-act="biz-sell" data-id="${b.id}" id="b-bs-${b.id}">${tr('Vender uma', 'Sell one')} <small id="bz-s-${b.id}"></small></button></td></tr>`;
           }
           h += '</table></section>';
+          if (B.loans(S).length) {
+            h += `<section class="card"><h3>${tr('Financiamentos', 'Loans')}</h3>
+              <p class="muted">${tr('Amortizar abate o saldo sem multa: escolha baixar a parcela (mesmo prazo) ou o prazo (mesma parcela).',
+                'Prepaying cuts the balance with no penalty: choose to lower the payment (same term) or the term (same payment).')}</p><table class="tbl">`;
+            B.loans(S).forEach((l, k) => {
+              h += `<tr><td><b>${B.biz(l.id).n}</b><br><small class="muted" id="bl-s-${k}"></small></td>
+                <td class="ops"><input id="bl-in-${k}" inputmode="decimal" size="10" placeholder="${tr('valor em R$', 'amount in R$')}">
+                <button data-act="biz-prepay" data-i="${k}" data-mode="pmt" id="b-blp-${k}">${tr('Amortizar ↓ parcela', 'Prepay ↓ payment')}</button>
+                <button data-act="biz-prepay" data-i="${k}" data-mode="term" id="b-blt-${k}">${tr('Amortizar ↓ prazo', 'Prepay ↓ term')}</button>
+                <button data-act="biz-payoff" data-i="${k}" id="b-blq-${k}">${tr('Quitar', 'Pay off')} <small id="bl-q-${k}"></small></button></td></tr>`;
+            });
+            h += '</table></section>';
+          }
         }
         if (S.research.gestora) {
           h += `<section class="card"><h3>${tr('Gestora', 'Asset manager')}</h3>`;
@@ -1398,9 +1511,22 @@
             dis(`b-bf-${b.id}`, S.cash < q.down || !B.allowed(S, b));
             why(`b-bf-${b.id}`, tierMsg || need(S, { cash: q.down }));
             dis(`b-bh-${b.id}`, m >= n);
+            const sev = B.severance(S, b.id);
+            set(`bz-x-${b.id}`, m ? tr(`rescisão ${f.money(sev)}`, `severance ${f.money(sev)}`) : '');
+            dis(`b-bx-${b.id}`, !m || S.cash < sev);
+            why(`b-bx-${b.id}`, !m ? tr('nenhuma unidade com gerente', 'no unit has a manager') : need(S, { cash: sev }));
             dis(`b-bs-${b.id}`, !n);
             set(`bz-s-${b.id}`, n ? f.money(B.saleValue(S, b)) : '');
           }
+          B.loans(S).forEach((l, k) => {
+            set(`bl-s-${k}`, tr(`saldo ${f.money(l.bal)} · parcela ${f.money(B.loanPayment(S, l))} · ${l.left} meses`,
+              `balance ${f.money(l.bal)} · payment ${f.money(B.loanPayment(S, l))} · ${l.left} months`));
+            set(`bl-q-${k}`, f.money(l.bal));
+            dis(`b-blp-${k}`, S.cash <= 0);
+            dis(`b-blt-${k}`, S.cash <= 0);
+            dis(`b-blq-${k}`, S.cash < l.bal);
+            why(`b-blq-${k}`, need(S, { cash: l.bal }));
+          });
         }
         if (S.fund) {
           const F = G.fund;
@@ -1451,7 +1577,8 @@
               <td>${x.selling ? `<small class="muted">${tr('à venda', 'for sale')}</small>` : `<select data-set="crop" data-i="${i}">${l.crops.map(c =>
                 `<option value="${c}"${c === x.crop ? ' selected' : ''}>${A.CROPS[c].n}</option>`).join('')}</select>
                 ${farm ? `<label class="check"><input type="checkbox" data-act="agro-ins" data-i="${i}"${x.insured ? ' checked' : ''}> ${tr('seguro rural', 'crop insurance')}</label>` : ''}
-                ${A.operated(x) ? (x.mgr ? `<br><small class="muted">${tr('com gerente agrícola', 'with a farm manager')}</small>`
+                ${A.operated(x) ? (x.mgr ? `<br><small class="muted">${tr('com gerente agrícola', 'with a farm manager')}</small>
+                  <button data-act="agro-fire" data-i="${i}" id="b-af-${i}">${tr('Demitir', 'Fire')} <small id="t-x-${i}"></small></button>`
                   : S.research.gestao_pessoas ? `<br><button data-act="agro-hire" data-i="${i}">${tr('Contratar gerente <small>12% do lucro</small>', 'Hire a manager <small>12% of profit</small>')}</button>`
                   : `<br><small class="muted">${tr(`consome ${l.energy} de energia/dia`, `drains ${l.energy} energy/day`)}</small>`) : ''}`}</td>
               <td>${x.selling ? '' : `<button data-act="agro-sell" data-i="${i}">${tr('Vender', 'Sell')}</button>`}</td></tr>`;
@@ -1479,6 +1606,12 @@
         S.agro.lands.forEach((x, i) => {
           const v = A.value(S, x);
           set(`t-v-${i}`, f.money(v));
+          if (x.mgr) {
+            const sev = A.severance(S, x);
+            set(`t-x-${i}`, tr(`rescisão ${f.money(sev)}`, `severance ${f.money(sev)}`));
+            dis(`b-af-${i}`, S.cash < sev);
+            why(`b-af-${i}`, need(S, { cash: sev }));
+          }
           const pl = $(`t-pl-${i}`);
           if (pl) {
             pl.textContent = `${f.signedPct(v / x.cost - 1, 1)} ${tr('desde a compra', 'since purchase')}`;
@@ -1486,7 +1619,7 @@
           }
           const crop = A.PLANTED[x.planted && x.planted.crop] || (x.planted && x.planted.crop);
           const planted = x.planted ? tr(`${crop} plantado, colheita em ${f.MESES[x.planted.harvest - 1]}`, `${crop} planted, harvest in ${f.MESES[x.planted.harvest - 1]}`) : '';
-          set(`t-s-${i}`, x.selling ? tr(`à venda: ~${x.selling} dias`, `for sale: ~${x.selling} days`) : [planted, x.last].filter(Boolean).join(' · ') || A.CROPS[x.crop].n.toLowerCase());
+          set(`t-s-${i}`, x.selling ? tr(`à venda: ~${x.selling} dias`, `for sale: ~${x.selling} days`) : [planted, G.i18n.show(x.last, x.last2, x.lastL)].filter(Boolean).join(' · ') || A.CROPS[x.crop].n.toLowerCase());
         });
       },
     },
@@ -1508,7 +1641,8 @@
           <p class="muted">On purchase: 3% transfer tax (ITBI) and notary fees. On sale: 6% realtor fee, 15% income tax on the gain and months until a buyer shows up.
           Rent pays 8% to the property manager and 15% income tax; a vacant property costs building fees and property tax.</p><table class="tbl">`);
         for (const p of G.PROPERTIES) {
-          h += `<tr><td>${p.n}<br><small class="muted">${tr('aluguel', 'rent')} ~${f.pct(p.yield, 1)} ${tr('a.a.', 'p.a.')}</small></td><td id="re-p-${p.id}"></td>
+          h += `<tr><td>${p.n}<br><small class="muted">${tr('aluguel', 'rent')} ~${f.pct(p.yield, 1)} ${tr('a.a.', 'p.a.')} · ${p.people
+            ? tr(`moradia para até ${p.people} pessoas`, `home for up to ${p.people} people`) : tr('comercial', 'commercial')}</small></td><td id="re-p-${p.id}"></td>
             <td class="ops"><button data-act="re-buy" data-id="${p.id}" id="b-re-${p.id}">${tr('À vista', 'Pay cash')} <small id="re-c-${p.id}"></small></button>
             ${fin ? `<button data-act="re-fin" data-id="${p.id}" id="b-rf-${p.id}">${tr('Financiar', 'Finance')} <small id="re-f-${p.id}"></small></button>` : ''}</td></tr>`;
         }
@@ -1517,9 +1651,13 @@
           h += `<section class="card"><h3>${tr('Seus imóveis', 'Your properties')}</h3><table class="tbl">`;
           S.realty.forEach((x, i) => {
             h += `<tr><td>${R.prop(x.pid).n}<br><small class="muted" id="rh-s-${i}"></small></td>
-              <td><b id="rh-v-${i}"></b><br><small id="rh-pl-${i}"></small></td><td><small id="rh-l-${i}"></small></td>
+              <td><b id="rh-v-${i}"></b><br><small id="rh-pl-${i}"></small></td><td><small id="rh-l-${i}"></small>${x.loan && !x.selling ? `
+                <br><input id="rh-in-${i}" inputmode="decimal" size="10" placeholder="${tr('valor em R$', 'amount in R$')}">
+                <button data-act="re-prepay" data-i="${i}" data-mode="pmt" id="b-rp-${i}">${tr('Amortizar ↓ parcela', 'Prepay ↓ payment')}</button>
+                <button data-act="re-prepay" data-i="${i}" data-mode="term" id="b-rt-${i}">${tr('Amortizar ↓ prazo', 'Prepay ↓ term')}</button>
+                <button data-act="re-payoff" data-i="${i}" id="b-rq-${i}">${tr('Quitar', 'Pay off')}</button>` : ''}</td>
               <td>${x.selling ? '' : `<button data-act="re-sell" data-i="${i}">${tr('Vender', 'Sell')}</button>`}
-                ${x.home ? `<br><small class="good">${tr('você mora aqui', 'you live here')}</small>` : !x.selling && !x.occupied ? `<br><button data-act="home" data-i="${i}" id="b-home-${i}">${tr('Morar aqui', 'Live here')}</button>` : ''}</td></tr>`;
+                ${x.home ? `<br><small class="good">${tr('você mora aqui', 'you live here')}</small>` : !x.selling && !x.occupied && R.prop(x.pid).people ? `<br><button data-act="home" data-i="${i}" id="b-home-${i}">${tr('Morar aqui', 'Live here')}</button>` : ''}</td></tr>`;
           });
           h += '</table></section>';
         }
@@ -1548,9 +1686,9 @@
           const v = R.value(S, x);
           set(`rh-s-${i}`, x.selling ? tr(`à venda: ~${x.selling} dias para fechar`, `for sale: ~${x.selling} days to close`) : x.home ? tr('sua casa', 'your home')
             : x.occupied ? tr(`alugado · ${f.money(R.rent(S, x))}/mês bruto`, `rented · ${f.money(R.rent(S, x))}/month gross`) : tr('vago, procurando inquilino', 'vacant, looking for a tenant'));
-          const small = v < G.life.homeMin(S);
-          dis(`b-home-${i}`, small);
-          why(`b-home-${i}`, small ? tr(`pequeno para o seu padrão de vida: precisa valer ${f.money(G.life.homeMin(S))}`, `too small for your lifestyle: must be worth ${f.money(G.life.homeMin(S))}`)
+          const problem = G.life.homeProblem(S, x);
+          dis(`b-home-${i}`, !!problem);
+          why(`b-home-${i}`, problem ? homeWhy(S, x)
             : tr('para de alugar e corta 40% do custo de vida', 'stop renting and cut 40% of your cost of living'));
           set(`rh-v-${i}`, f.money(v));
           const pl = $(`rh-pl-${i}`);
@@ -1560,7 +1698,260 @@
           }
           set(`rh-l-${i}`, x.loan ? tr(`saldo devedor ${f.money(x.loan.bal)} · parcela ${f.money(x.loan.pmt)} · ${x.loan.left} meses`,
             `balance ${f.money(x.loan.bal)} · payment ${f.money(x.loan.pmt)} · ${x.loan.left} months`) : tr('quitado', 'paid off'));
+          if (x.loan) {
+            dis(`b-rp-${i}`, S.cash <= 0);
+            dis(`b-rt-${i}`, S.cash <= 0);
+            dis(`b-rq-${i}`, S.cash < x.loan.bal);
+            why(`b-rq-${i}`, need(S, { cash: x.loan.bal }));
+          }
         });
+      },
+    },
+
+    dinastia: {
+      key: S => {
+        const D = G.dynasty, f = S.social.family;
+        return [D.surname(S), S.me && S.me.name, f.married, f.spouse, D.children(S).map(c => c.id + (D.age(S, c) >= D.ADULT ? 'a' : '') + c.dream + (c.focus || '')).join(),
+          D.heir(S) && D.heir(S).id, f.heir, G.legacy.elders(S).length, D.relatives(S).length, S.legacy.generation].join('|');
+      },
+      build(S) {
+        const D = G.dynasty, f = S.social.family, W = G.work, esc2 = x => esc(x || '');
+        const heir = D.heir(S), kids = D.children(S);
+        let h = `<section class="card"><h3>${esc(D.familyName(S))}</h3>
+          <p>${tr('Sobrenome', 'Surname')} <input data-set="surname" value="${esc2(D.surname(S))}" maxlength="30">
+          ${tr('Seu nome', 'Your name')} <input data-set="myname" value="${esc2(S.me && S.me.name)}" maxlength="30"></p>
+          <p class="muted">${tr(`Geração ${S.legacy.generation}. Você é o líder da família; os anciãos são as gerações que se aposentaram e ainda vivem. Quando um ancião morre, o patrimônio dele vira herança.
+            Cada filho nasce com aptidões (o potencial em cada área) e um sonho de carreira. Escolha o foco da educação (${G.fmt.money(D.FOCUS_COST * S.macro.priceIndex)}/mês por filho):
+            as habilidades crescem até a aptidão. Insistir numa área longe do sonho desgasta a relação; com relação boa, o sonho pode mudar.
+            Escolha o herdeiro: ele assume com a idade real e o que aprendeu (finanças e negócios dão cargo inicial e conhecimento, política dá influência, ciência dá conhecimento, artes dão prestígio).
+            Os outros filhos saem de casa aos ${D.ADULT} anos, seguem carreira e ajudam a família.`,
+            `Generation ${S.legacy.generation}. You are the head of the family; the elders are the generations that retired and are still alive. When an elder dies, their estate becomes an inheritance.
+            Each child is born with aptitudes (their potential in each area) and a dream career. Choose the focus of their education (${G.fmt.money(D.FOCUS_COST * S.macro.priceIndex)}/month per child):
+            skills grow up to the aptitude. Pushing an area far from their dream wears the relationship down; with a good relationship, the dream can change.
+            Choose the heir: they take over at their real age with what they learned (finance and business give a starting position and knowledge, politics gives influence, science gives knowledge, arts give prestige).
+            The other children move out at ${D.ADULT}, pursue careers and help the family.`)}</p></section>`;
+
+        // Líder, cônjuge e anciãos
+        h += `<section class="card"><h3>${tr('Casa', 'Household')}</h3><table class="tbl">
+          <tr><td><b>${esc2(S.me && S.me.name)}</b> <small class="muted">${tr('líder', 'head')}</small></td><td id="dy-me"></td></tr>`;
+        if (f.married) h += `<tr><td>${esc2(f.spouse)} <small class="muted">${tr('cônjuge', 'spouse')}</small></td><td></td></tr>`;
+        G.legacy.elders(S).forEach((e, i) => {
+          h += `<tr><td>${esc2(e.name) || tr(`${e.gen}ª geração`, `Generation ${e.gen}`)} <small class="muted">${tr('ancião', 'elder')}${e.spouse ? ` · ${tr('com', 'with')} ${esc(e.spouse)}` : ''}</small></td><td id="dy-el-${i}"></td></tr>`;
+        });
+        h += '</table></section>';
+
+        // Filhos
+        h += `<section class="card"><h3>${tr('Filhos', 'Children')} <small>${kids.length}</small></h3>`;
+        if (!kids.length) h += `<p class="muted">${tr('Sem filhos ainda. Casamento e filhos ficam na aba Vida → Família.', 'No children yet. Marriage and children are in the Life tab → Family.')}</p>`;
+        const areaOpts = sel => `<option value="">${tr('sem foco', 'no focus')}</option>` + D.AREAS.map(a => `<option value="${a.id}"${a.id === sel ? ' selected' : ''}>${a.n}</option>`).join('');
+        for (const c of kids) {
+          const adult = D.age(S, c) >= D.ADULT;
+          h += `<div class="research"><div><b>${esc(c.name)}</b> <span id="dy-age-${c.id}" class="muted"></span>
+            ${heir && heir.id === c.id ? ` <span class="good">${tr('herdeiro', 'heir')}</span>` : ''}
+            <p class="muted">${tr('Sonho', 'Dream')}: ${D.area(c.dream).career}${adult ? tr(' (seguindo carreira)', ' (pursuing it)') : ''} · ${tr('relação', 'relationship')} <span id="dy-bond-${c.id}"></span></p>
+            <table class="tbl alloc">${D.AREAS.map(a => `<tr><td>${a.n}</td><td id="dy-sk-${c.id}-${a.id}"></td></tr>`).join('')}</table></div>
+            <div class="btns" style="display:block">
+            ${adult ? '' : `<p>${tr('Foco', 'Focus')} <select data-set="focus" data-id="${c.id}">${areaOpts(c.focus)}</select></p>`}
+            <button data-act="kid-time" data-id="${c.id}" id="b-kt-${c.id}">${tr('Passar tempo junto', 'Spend time together')} <small>${D.TIME_ENERGY} ${tr('energia', 'energy')} · ${tr('relação', 'relationship')} +6</small></button>
+            ${heir && heir.id === c.id && f.heir === c.id ? '' : `<button data-act="kid-heir" data-id="${c.id}">${tr('Escolher como herdeiro', 'Choose as heir')}</button>`}
+            </div></div>`;
+        }
+        h += '</section>';
+        if (heir) h += `<section class="card"><h3>${tr('Se', 'If')} ${esc(heir.name)} ${tr('assumisse hoje', 'took over today')}</h3><p id="dy-heir"></p></section>`;
+
+        // Parentes
+        const rel = D.relatives(S);
+        if (rel.length) {
+          h += `<section class="card"><h3>${tr('Parentes', 'Relatives')}</h3><p class="muted">${tr('Irmãos das gerações que lideraram. Seguem a carreira e ajudam a família todo mês.',
+            'Siblings of past heads of the family. They pursue their careers and help the family every month.')}</p><table class="tbl">`;
+          rel.forEach((r, i) => {
+            h += `<tr><td>${esc(r.name)} <small class="muted">${tr(`${r.gen}ª geração`, `generation ${r.gen}`)}</small></td><td>${D.area(r.dream).career}</td><td id="dy-rel-${i}"></td></tr>`;
+          });
+          h += '</table></section>';
+        }
+        return h;
+      },
+      update(S) {
+        const D = G.dynasty, f = G.fmt;
+        set('dy-me', tr(`${Math.floor(G.legacy.age(S))} anos · ${G.work.CAREER[S.job.level].t}`, `age ${Math.floor(G.legacy.age(S))} · ${G.work.CAREER[S.job.level].t}`));
+        G.legacy.elders(S).forEach((e, i) => set(`dy-el-${i}`, tr(`${Math.floor(e.age + (S.day - e.since) / 360)} anos · patrimônio ${f.money(e.estate)}`,
+          `age ${Math.floor(e.age + (S.day - e.since) / 360)} · estate ${f.money(e.estate)}`)));
+        for (const c of D.children(S)) {
+          const age = D.age(S, c);
+          set(`dy-age-${c.id}`, age < 1 ? tr(`${Math.floor(age * 12)} meses`, `${Math.floor(age * 12)} months`) : tr(`${Math.floor(age)} anos`, `age ${Math.floor(age)}`));
+          const b = $(`dy-bond-${c.id}`);
+          if (b) { b.textContent = f.num(c.bond, 0); b.className = c.bond < 30 ? 'bad' : c.bond >= 70 ? 'good' : ''; }
+          for (const a of D.AREAS) {
+            set(`dy-sk-${c.id}-${a.id}`, tr(`${f.num(c.skill[a.id], 0)} de ${f.num(c.apt[a.id], 0)}`, `${f.num(c.skill[a.id], 0)} of ${f.num(c.apt[a.id], 0)}`)
+              + (a.id === c.dream ? ' ★' : '') + (a.id === c.focus ? tr(' · foco', ' · focus') : ''));
+          }
+          dis(`b-kt-${c.id}`, !D.canSpendTime(S, c));
+          why(`b-kt-${c.id}`, S.day < (c.cd || 0) ? tr(`de novo em ${c.cd - S.day} dias`, `available again in ${c.cd - S.day} days`) : need(S, { energy: D.TIME_ENERGY }));
+        }
+        const heir = D.heir(S);
+        if (heir) {
+          const x = D.heirBonus(heir), age = Math.max(18, D.age(S, heir));
+          set('dy-heir', tr(`Assumiria com ${Math.floor(age)} anos como ${G.work.CAREER[x.level].t}, +${f.num(x.knowledge, 0)} de conhecimento, +${f.num(x.reputation, 0)} de reputação, +${f.num(x.influence, 0)} de influência e +${f.num(x.prestige, 0)} de prestígio${x.research.length ? `, com ${new Set(x.research).size} pesquisa(s) feitas` : ''}.${heir.bond < 30 ? ' A relação ruim corta 40% disso.' : ''}`,
+            `Would take over at age ${Math.floor(age)} as ${G.work.CAREER[x.level].t}, +${f.num(x.knowledge, 0)} knowledge, +${f.num(x.reputation, 0)} reputation, +${f.num(x.influence, 0)} influence and +${f.num(x.prestige, 0)} prestige${x.research.length ? `, with ${new Set(x.research).size} research item(s) done` : ''}.${heir.bond < 30 ? ' The poor relationship cuts 40% of that.' : ''}`));
+        }
+        D.relatives(S).forEach((r, i) => set(`dy-rel-${i}`, tr(`${Math.floor((S.day - r.born) / 360)} anos · habilidade ${f.num(r.skill, 0)}`, `age ${Math.floor((S.day - r.born) / 360)} · skill ${f.num(r.skill, 0)}`)));
+      },
+    },
+
+    familias: {
+      key: S => [G.social.tierIdx(S), G.families.ranking(S).map(r => r.id).join(), G.politics.hasBigMedia(S),
+        G.families.FAMILIES.map(fm => G.families.relation(S, fm.id) + (G.families.st(S, fm.id).dossie ? 'd' : '')).join()].join('|'),
+      build(S) {
+        const FM = G.families, P = G.macro.POLICIES;
+        let h = `<section class="card summary"><span>${tr('Sua posição no ranking', 'Your ranking position')} <b id="fm-rank"></b></span>
+          <span>${tr('Aliadas', 'Allies')} <b>${FM.allies(S).length}/${FM.MAX_ALLIES}</b></span><span id="fm-war" class="bad"></span></section>
+          <p class="muted">${tr(`As famílias mais ricas do país. Cada uma vive de um setor e é um grupo de poder ligado a uma plataforma política: empurra a sua nas eleições.
+          Competir no setor delas, apoiar a plataforma rival ou atacá-las cria rivais, e rivais sabotam (guerra de preços, difamação, lobby contra, roubo de gerentes, denúncias).
+          Aliadas abrem portas, ajudam em campanhas e deixam de sabotar. Ações com a mesma família: uma a cada 3 meses.`,
+          `The country's richest families. Each lives off a sector and is a power group tied to a political platform, pushing it in elections.
+          Competing in their sector, backing the rival platform or attacking them creates rivals, and rivals sabotage you (price wars, smears, lobbying against you, poaching managers, complaints).
+          Allies open doors, help in campaigns and stop sabotaging. Actions with the same family: one every 3 months.`)}</p>
+          <section class="card"><table class="tbl"><tr><td><b>#</b></td><td><b>${tr('Família', 'Family')}</b></td><td><b>${tr('Patrimônio', 'Net worth')}</b></td>
+          <td><b>${tr('Relação', 'Relationship')}</b></td><td></td></tr>`;
+        FM.ranking(S).forEach((r, i) => {
+          if (r.you) {
+            h += `<tr class="cur"><td>${i + 1}</td><td>${tr(`Sua família (${S.legacy.generation}ª geração)`, `Your family (generation ${S.legacy.generation})`)}</td><td id="fm-w-voce"></td><td></td><td></td></tr>`;
+            return;
+          }
+          const fm = FM.byId(r.id), x = FM.st(S, r.id);
+          const ld = x.leader;
+          h += `<tr><td>${i + 1}</td><td><b>${fm.n}</b><br><small class="muted">${FM.sectorName(fm)} · ${P[fm.side].n} · ${fm.d}${ld ? ` ${tr(`Líder: ${ld.name}, ${Math.floor(ld.age)} anos, gestão ${ld.skill >= 70 ? 'forte' : ld.skill >= 45 ? 'regular' : 'fraca'}.`,
+            `Head: ${ld.name}, age ${Math.floor(ld.age)}, ${ld.skill >= 70 ? 'strong' : ld.skill >= 45 ? 'average' : 'weak'} management.`)}` : ''}</small></td>
+            <td id="fm-w-${fm.id}"></td><td id="fm-r-${fm.id}"></td><td class="ops">
+            <button data-act="fam-approach" data-id="${fm.id}" id="b-fa-${fm.id}">${tr('Aproximar', 'Get closer')} <small id="fm-ac-${fm.id}"></small></button>
+            ${x.ally ? `<button data-act="fam-break" data-id="${fm.id}">${tr('Romper aliança', 'Break alliance')}</button>`
+              : `<button data-act="fam-ally" data-id="${fm.id}" id="b-fl-${fm.id}">${tr('Propor aliança', 'Propose alliance')} <small>30 ${tr('influência', 'influence')}</small></button>`}
+            <button data-act="fam-inv" data-id="${fm.id}" id="b-fi-${fm.id}">${tr('Investigar', 'Investigate')} <small id="fm-ic-${fm.id}"></small></button>
+            <button data-act="fam-attack" data-id="${fm.id}" id="b-fk-${fm.id}">${tr('Atacar na mídia', 'Attack in the media')}${x.dossie ? ` <small>${tr('com dossiê', 'with dossier')}</small>` : ''}</button></td></tr>`;
+        });
+        return h + '</table></section>';
+      },
+      update(S) {
+        const FM = G.families;
+        set('fm-rank', tr(`${FM.myRank(S)}º`, `#${FM.myRank(S)}`));
+        set('fm-w-voce', f.money(Math.max(0, G.portfolio.netWorth(S))));
+        const war = S.fam.priceWar;
+        set('fm-war', war && S.day < war.until ? tr(`Guerra de preços da família ${FM.byId(war.by).n}: suas empresas do setor lucram 20% menos até ${f.monthYear(war.until)}.`,
+          `Price war by the ${FM.byId(war.by).n} family: your businesses in the sector earn 20% less until ${f.monthYear(war.until)}.`) : '');
+        for (const fm of FM.FAMILIES) {
+          const x = FM.st(S, fm.id), rel = FM.relation(S, fm.id);
+          set(`fm-w-${fm.id}`, f.money(x.w));
+          const el = $(`fm-r-${fm.id}`);
+          if (el) {
+            el.textContent = `${FM.RELATION_NAME[rel]} (${f.num(x.att, 0)})`;
+            el.className = rel === 'aliada' || rel === 'amistosa' ? 'good' : rel === 'hostil' || rel === 'rival' ? 'bad' : '';
+          }
+          const tier = G.social.tierIdx(S) < FM.tierReq(fm) ? tr(`requer posição ${G.social.TIERS[FM.tierReq(fm)][1]}`, `requires ${G.social.TIERS[FM.tierReq(fm)][1]} status`) : '';
+          const wait = S.day < x.cd ? tr(`de novo em ${x.cd - S.day} dias`, `available again in ${x.cd - S.day} days`) : '';
+          set(`fm-ac-${fm.id}`, f.money(FM.approachCost(S)));
+          set(`fm-ic-${fm.id}`, f.money(FM.investigateCost(S)));
+          dis(`b-fa-${fm.id}`, !FM.canAct(S, fm) || S.cash < FM.approachCost(S));
+          why(`b-fa-${fm.id}`, tier || wait || need(S, { cash: FM.approachCost(S) }));
+          dis(`b-fl-${fm.id}`, !FM.canAlly(S, fm));
+          why(`b-fl-${fm.id}`, FM.canAlly(S, fm) ? '' : tier || wait || (x.att < 40 ? tr('a relação precisa estar em 40 ou mais', 'the relationship must be 40 or higher')
+            : FM.allies(S).length >= FM.MAX_ALLIES ? tr(`no máximo ${FM.MAX_ALLIES} aliadas`, `at most ${FM.MAX_ALLIES} allies`) : tr('precisa de 30 de influência', 'needs 30 influence')));
+          dis(`b-fi-${fm.id}`, S.day < x.cd || S.cash < FM.investigateCost(S));
+          why(`b-fi-${fm.id}`, wait || need(S, { cash: FM.investigateCost(S) }));
+          dis(`b-fk-${fm.id}`, !FM.canAttack(S, fm));
+          why(`b-fk-${fm.id}`, FM.canAttack(S, fm) ? '' : wait || (!x.dossie && !G.politics.hasBigMedia(S)
+            ? tr('precisa de um dossiê (investigar) ou de um portal ou canal de TV', 'needs a dossier (investigate) or a news website or TV channel') : tr('precisa de 20 de influência', 'needs 20 influence')));
+        }
+      },
+    },
+
+    brasil: {
+      key: S => {
+        const N = G.nation, n = S.nation;
+        return [N.isPresident(S), n.pending ? n.pending.id : '', Object.keys(n.reforms).join(), n.unSeat, !!n.reforms.bc_autonomo,
+          N.worldRanking(S).map(r => r.id).join()].join('|');
+      },
+      build(S) {
+        const N = G.nation, n = S.nation, pres = N.isPresident(S), P = G.macro.POLICIES;
+        let h = `<section class="card summary"><span>${tr('PIB', 'GDP')} <b id="nx-gdp"></b></span><span>${tr('Crescimento', 'Growth')} <b id="nx-g"></b></span>
+          <span>${tr('Dívida pública', 'Public debt')} <b id="nx-debt"></b></span><span>${tr('Aprovação', 'Approval')} <b id="nx-appr"></b></span>
+          <span>${tr('Governabilidade', 'Governability')} <b id="nx-gov"></b></span><span>${tr('Poder nacional', 'National power')} <b id="nx-pow"></b></span>
+          <span>${tr('Posição no mundo', 'World rank')} <b id="nx-rank"></b></span></section>`;
+        if (!pres) {
+          h += `<p class="muted">${tr(`Governo atual: plataforma ${P[S.macro.policy].n}, conduzido pela IA. Você só governa se vencer a eleição presidencial (aba Poder).`,
+            `Current government: ${P[S.macro.policy].n} platform, run by the AI. You only govern if you win the presidential election (Power tab).`)}</p>`;
+        } else {
+          h += `<section class="card"><h3>${tr('Orçamento', 'Budget')}</h3>
+            <p class="muted">${tr('Divida o gasto do governo entre as áreas (em %; o total é normalizado). Cada índice persegue um alvo que depende da verba; educação e tecnologia respondem devagar.',
+              'Split government spending across areas (in %; the total is normalized). Each index chases a target set by its funding; education and technology respond slowly.')}</p>
+            <table class="tbl alloc"><tr><td><b>${tr('Área', 'Area')}</b></td><td><b>${tr('Verba', 'Funding')}</b></td><td><b>${tr('Índice', 'Index')}</b></td></tr>`;
+          for (const a of N.AREAS) {
+            h += `<tr><td>${a.n}</td><td><input class="num" data-nb="${a.id}" value="${n.budget[a.id]}" inputmode="numeric"> %</td><td id="nb-v-${a.id}"></td></tr>`;
+          }
+          const stances = [[-2, tr('austeridade forte', 'strong austerity')], [-1, tr('austeridade', 'austerity')], [0, tr('neutra', 'neutral')], [1, tr('expansão', 'expansion')], [2, tr('expansão forte', 'strong expansion')]];
+          h += `</table><p class="muted" id="nb-sum"></p></section>
+            <section class="card"><h3>${tr('Política econômica', 'Economic policy')}</h3>
+            <p>${tr('Postura fiscal', 'Fiscal stance')} <select data-set="stance">${stances.map(([v, l]) => `<option value="${v}"${v === n.stance ? ' selected' : ''}>${l}</option>`).join('')}</select>
+            <span class="muted">${tr('gastar mais acelera o crescimento e a aprovação agora, mas aumenta déficit, dívida e inflação', 'spending more speeds up growth and approval now, but raises the deficit, debt and inflation')}</span></p>
+            <p>${tr('Emendas e cargos para a base', 'Pork and posts for the coalition')} <select data-set="emendas">${[0, 1, 2, 3].map(v => `<option value="${v}"${v === n.emendas ? ' selected' : ''}>${v}</option>`).join('')}</select>
+            <span class="muted">${tr('cada nível dá governabilidade, custa 0,2% do PIB por ano, corrói as instituições e suja você', 'each level adds governability, costs 0.2% of GDP a year, erodes institutions and dirties you')}</span></p>
+            <p><label class="check"><input type="checkbox" data-act="bc" id="nx-bc"${n.reforms.bc_autonomo ? ' disabled' : ''}> ${tr('Pressionar o Banco Central por juros menores (Selic −1 ponto, inflação sobe)',
+              'Pressure the Central Bank for lower rates (Selic −1 point, inflation rises)')}</label></p></section>
+            <section class="card"><h3>${tr('Reformas', 'Reforms')}</h3>
+            <p class="muted">${tr('Uma por vez. Enviar gasta governabilidade; a aprovação depende da governabilidade e das instituições.',
+              'One at a time. Sending one spends governability; passage depends on governability and institutions.')}</p><table class="tbl">`;
+          for (const r of N.REFORMS) {
+            const st = n.reforms[r.id] ? `<span class="good">${tr('aprovada', 'passed')}</span>`
+              : n.pending && n.pending.id === r.id ? `<span class="muted" id="nx-pend"></span>`
+              : `<button data-act="reform" data-id="${r.id}" id="b-nr-${r.id}">${tr('Enviar ao Congresso', 'Send to Congress')} <small>${tr('governab.', 'govern.')} ${f.pct(r.gov, 0)}</small></button>`;
+            h += `<tr><td><b>${r.n}</b><br><small class="muted">${r.d} ${tr(`Tramitação: ${r.months} meses.`, `Takes ${r.months} months.`)}</small></td><td>${st}</td></tr>`;
+          }
+          h += `</table></section><section class="card"><h3>${tr('Diplomacia', 'Diplomacy')}</h3><div class="btns">
+            <button data-act="summit" id="b-summit">${tr('Viagem de Estado', 'State visit')} <small>${tr('diplomacia +3 · uma a cada 3 meses', 'diplomacy +3 · one every 3 months')}</small></button>
+            ${n.unSeat ? `<span class="good">${tr('Assento permanente na ONU conquistado', 'Permanent UN seat secured')}</span>`
+              : `<button data-act="unseat" id="b-un">${tr('Assento permanente no Conselho de Segurança da ONU', 'Permanent UN Security Council seat')} <small>${tr('diplomacia 80 e top 6 do mundo', 'diplomacy 80 and world top 6')}</small></button>`}
+            </div></section>`;
+        }
+        h += `<section class="card"><h3>${tr('Índices do país', 'Country indices')}</h3><table class="tbl">`;
+        for (const a of N.AREAS.concat(N.EXTRA)) h += `<tr><td>${a.n}</td><td id="nx-i-${a.id}"></td></tr>`;
+        h += `</table></section><section class="card"><h3>${tr('Poder mundial', 'World power')}</h3>
+          <p class="muted">${tr(`Tamanho e renda da economia, educação, tecnologia, defesa, diplomacia, instituições, infraestrutura e estabilidade. Superpotência: poder ${N.SUPERPOWER} e top 3.`,
+            `Economic size and income, education, technology, defense, diplomacy, institutions, infrastructure and stability. Superpower: power ${N.SUPERPOWER} and top 3.`)}</p><table class="tbl">`;
+        N.worldRanking(S).forEach((r, i) => {
+          h += `<tr class="${r.you ? 'cur' : ''}"><td>${i + 1}</td><td>${r.n}</td><td id="nw-${r.id}"></td></tr>`;
+        });
+        return h + '</table></section>';
+      },
+      update(S) {
+        const N = G.nation, n = S.nation, pres = N.isPresident(S);
+        set('nx-gdp', f.money(n.gdpReal * S.macro.priceIndex));
+        const g = $('nx-g');
+        if (g) { g.textContent = f.signedPct(n.growth, 1) + tr(' a.a.', ' p.a.'); g.className = n.growth >= 0.02 ? 'good' : n.growth < 0 ? 'bad' : ''; }
+        const debt = $('nx-debt');
+        if (debt) { debt.textContent = f.pct(n.debt, 0) + tr(' do PIB', ' of GDP'); debt.className = n.debt > 1 ? 'bad' : ''; }
+        const ap = $('nx-appr');
+        if (ap) { ap.textContent = f.pct(n.approval, 0); ap.className = n.approval < 0.25 ? 'bad' : n.approval > 0.5 ? 'good' : ''; }
+        set('nx-gov', f.pct(n.gov, 0));
+        set('nx-pow', f.num(N.power(S), 1));
+        set('nx-rank', tr(`${N.rank(S)}º`, `#${N.rank(S)}`));
+        for (const a of N.AREAS.concat(N.EXTRA)) set(`nx-i-${a.id}`, f.num(n.idx[a.id], 0));
+        for (const r of N.worldRanking(S)) set(`nw-${r.id}`, f.num(r.p, 1));
+        if (!pres) return;
+        const sh = N.shares(S);
+        for (const a of N.AREAS) set(`nb-v-${a.id}`, `${f.num(n.idx[a.id], 0)} · ${f.pct(sh[a.id] / 100, 0)}`);
+        const total = Object.values(n.budget).reduce((s, v) => s + v, 0);
+        set('nb-sum', tr(`Total digitado: ${f.num(total, 0)}%. Déficit primário: ${f.pct(N.primary(S), 1)} do PIB por ano.`,
+          `Total entered: ${f.num(total, 0)}%. Primary deficit: ${f.pct(N.primary(S), 1)} of GDP a year.`));
+        const bc = $('nx-bc');
+        if (bc) bc.checked = !!n.bcPressure;
+        if (n.pending) set('nx-pend', tr(`em votação: ${n.pending.left} mês(es)`, `being voted: ${n.pending.left} month(s)`));
+        for (const r of N.REFORMS) {
+          dis(`b-nr-${r.id}`, !N.canReform(S, r));
+          why(`b-nr-${r.id}`, N.canReform(S, r) ? '' : n.pending ? tr('já há uma reforma em votação', 'a reform is already being voted') : tr(`precisa de ${f.pct(r.gov, 0)} de governabilidade`, `needs ${f.pct(r.gov, 0)} governability`));
+        }
+        dis('b-summit', !N.canDiplomacy(S));
+        why('b-summit', N.canDiplomacy(S) ? '' : tr(`de novo em ${n.dipCd - S.day} dias`, `available again in ${n.dipCd - S.day} days`));
+        dis('b-un', !N.canUN(S));
+        why('b-un', N.canUN(S) ? '' : tr('precisa de diplomacia 80 e estar no top 6 do mundo', 'needs diplomacy 80 and a world top 6 spot'));
       },
     },
 
@@ -1581,7 +1972,7 @@
         if (!A.deals.length) h += tr('<p class="muted">Novas rodadas aparecem todo mês.</p>', '<p class="muted">New rounds show up every month.</p>');
         A.deals.forEach((d, i) => {
           const cls = d.signal === 'forte' ? 'good' : d.signal === 'fraca' ? 'bad' : '';
-          h += `<div class="research"><div><b>${d.name}</b> <span class="muted">— ${d.pitch}</span>
+          h += `<div class="research"><div><b>${d.name}</b> <span class="muted">— ${G.i18n.show(d.pitch, d.pitch2, d.pitchL)}</span>
             <p>${tr('Tração', 'Traction')} <b class="${cls}">${G.angel.SIGNAL_NAMES[d.signal] || d.signal}</b> · ${tr('cheque de', 'check of')} ${f.money(d.ticket)} · <span class="muted" id="an-d-${i}"></span></p></div>
             <button data-act="angel" data-i="${i}" id="b-an-${i}">${tr('Investir', 'Invest')}</button></div>`;
         });
@@ -1649,18 +2040,12 @@
   }
 
   // Metas curtas no painel: promoção, FIRE e a próxima conquista da lista.
+  // Próximos passos (ver goals.js): um objetivo por eixo; clicar leva à aba onde ele se resolve.
   function goals(S) {
-    const W = G.work, out = [], nx = W.nextLevel(S);
-    if (nx && S.job.employed) {
-      const k = Math.max(0, nx.k - S.knowledge), r = Math.max(0, nx.rep - S.reputation);
-      const lack = [k && f.num(k, 0) + tr(' conhec.', ' knowl.'), r && f.num(r, 0) + tr(' reput.', ' rep.')].filter(Boolean).join(tr(' e ', ' and '));
-      out.push(W.canPromote(S) ? tr(`Promoção a ${nx.t} disponível!`, `Promotion to ${nx.t} available!`)
-        : tr(`${nx.t}: faltam ${lack}`, `${nx.t}: ${lack} short`));
-    }
-    if (S.research.fire && S.job.employed) out.push(`FIRE: ${f.pct(Math.max(0, G.portfolio.netWorth(S)) / W.fireNumber(S), 0)} ${tr('do número', 'of the number')}`);
-    const a = G.legacy.ACHIEVEMENTS.find(x => S.legacy.ach[x.id] === undefined);
-    if (a) out.push(`${tr('Conquista', 'Achievement')}: ${a.n}, ${a.d.charAt(0).toLowerCase() + a.d.slice(1)}`);
-    return out;
+    return G.goals.list(S).map(g => {
+      const body = `<b>${esc(G.goals.AXES[g.axis])}</b>: ${esc(g.text)}`;
+      return S.tabs[g.tab] ? `<button class="goal link" data-act="tab" data-id="${g.tab}">${body}</button>` : `<div class="goal">${body}</div>`;
+    }).join('');
   }
 
   function renderResources(S) {
@@ -1698,8 +2083,8 @@
     const re = G.realty.monthlyNet(S), bz = G.business.monthlyProfit(S), fd = S.fund ? S.fund.lastProfit : 0;
     const loans = re.pmt + G.business.monthlyPayments(S);
     const fam = S.social.family, spouse = fam.married ? fam.spouseIncome * S.macro.priceIndex : 0;
-    const social = spouse - G.social.clubFees(S) - G.social.schoolCost(S) - G.social.partilhaPayment(S);
-    const officePay = S.pol.office ? G.politics.office(S.pol.office.id).pay * S.macro.priceIndex : 0;
+    const social = spouse - G.social.clubFees(S) - G.social.schoolCost(S) - G.social.partilhaPayment(S) - G.dynasty.focusCost(S);
+    const officePay = (S.pol.office ? G.politics.office(S.pol.office.id).pay * S.macro.priceIndex : 0) + G.nation.pay(S);
     const polCost = G.politics.mediaUpkeep(S) + G.politics.thinkTankCost(S) + G.politics.entityFees(S) - officePay;
     const agro = G.agro.monthlyExpected(S) - G.agro.monthlyCost(S);
     // Mesma conta do motor: tudo que entra menos W.outflow (custo de vida, parcelas, clubes, política...).
@@ -1712,7 +2097,7 @@
     set('r-fund', f.money(fd));
     show('row-biz', bz !== 0);
     show('row-fund', !!S.fund);
-    set('r-rent', f.money(re.rent));
+    set('r-rent', f.money(re.rent - re.upkeep));
     set('r-agro', f.money(agro));
     show('row-agro', S.agro.lands.length > 0);
     set('r-loan', '−' + f.money(loans));
@@ -1725,18 +2110,22 @@
     show('row-k', S.tabs.conhecimento);
     show('row-yield', S.tabs.investimentos);
     show('row-infl', S.research.macro1);
-    const g = goals(S).map(x => `<div class="goal">${esc(x)}</div>`).join('');
+    const g = goals(S);
     if (keys.goals !== g) { keys.goals = g; $('r-goals').innerHTML = g; }
   }
 
+  // Abas; um "•" marca as que têm algo a fazer agora (goals.js), com os motivos no tooltip.
   function renderNav(S) {
     const tabs = TABS.filter(([id]) => S.tabs[id]);
     if (!S.tabs[active]) active = 'trabalho';
-    const k = tabs.map(t => t[0]).join() + '|' + active;
+    const badges = S.settings.badges === false ? {} : G.goals.badges(S);
+    const mark = id => (badges[id] && id !== active ? badges[id] : null);
+    const k = tabs.map(t => t[0] + (mark(t[0]) ? '*' + mark(t[0]).join('/') : '')).join() + '|' + active;
     if (keys.nav === k) return;
     keys.nav = k;
     $('tabs').innerHTML = tabs
-      .map(([id, n]) => `<button data-act="tab" data-id="${id}" class="tablink${id === active ? ' active' : ''}">${n}</button>`)
+      .map(([id, n]) => `<button data-act="tab" data-id="${id}" class="tablink${id === active ? ' active' : ''}"${mark(id) ? ` title="${esc(mark(id).join('; '))}"` : ''}>${n}${
+        mark(id) ? '<span class="badge">•</span>' : ''}</button>`)
       .join('<span class="sep">|</span>');
   }
 
@@ -1760,11 +2149,15 @@
     $('log').innerHTML = S.log
       .filter(e => !kinds || kinds.includes(e.k))
       .slice(0, 40)
-      .map(e => `<li class="k-${e.k}"><time>${f.date(e.d)}</time> ${esc(e.t)}</li>`)
+      .map(e => `<li class="k-${e.k}"><time>${f.date(e.d)}</time> ${esc(G.i18n.show(e.t, e.t2, e.l))}</li>`)
       .join('');
   }
 
   function render() {
+    G.i18n.rec = false; // a tela não grava textos: nada a registrar
+    try { renderAll(); } finally { G.i18n.rec = true; }
+  }
+  function renderAll() {
     const S = G.S;
     const cs = getComputedStyle(document.body);
     colors = { up: cs.getPropertyValue('--up').trim(), down: cs.getPropertyValue('--down').trim(), accent: cs.getPropertyValue('--warn').trim(), muted: cs.getPropertyValue('--muted').trim() };
@@ -1798,7 +2191,7 @@
     const input = () => parseMoney(($(`a-in-${id}`) || {}).value || '');
     const clearInput = x => { const el = $(`a-in-${x}`); if (el) el.value = ''; };
     const BLIND = ['buy', 'buymax', 'buyfrac', 'sell', 'sellall', 'sellfrac', 're-buy', 're-fin', 're-sell', 'angel', 'biz-open', 'biz-sell', 'biz-fin',
-      'biz-hire', 'agro-buy', 'agro-sell', 'agro-hire', 'agro-ins', 'fund-open', 'fund-sell', 'col-buy', 'col-sell', 'home', 'second-buy', 'second-sell'];
+      'biz-hire', 'biz-fire', 'biz-prepay', 'biz-payoff', 're-prepay', 're-payoff', 'agro-buy', 'agro-sell', 'agro-hire', 'agro-fire', 'agro-ins', 'fund-open', 'fund-sell', 'col-buy', 'col-sell', 'home', 'second-buy', 'second-sell'];
     if (BLIND.includes(b.dataset.act) && G.politics.blind(S)) {
       G.news(BLIND_MSG, 'info');
       render();
@@ -1826,6 +2219,7 @@
       case 're-buy': G.realty.buy(S, id, false); break;
       case 'agro-buy': G.agro.buy(S, id); break;
       case 'agro-hire': G.agro.hire(S, +b.dataset.i); break;
+      case 'agro-fire': G.agro.fire(S, +b.dataset.i); break;
       case 'agro-ins': G.agro.toggleInsurance(S, +b.dataset.i); break;
       case 'agro-sell': G.agro.sell(S, +b.dataset.i); break;
       case 're-fin': G.realty.buy(S, id, true); break;
@@ -1833,8 +2227,8 @@
       case 'angel': G.angel.invest(S, +b.dataset.i); break;
       case 'retire': W.retire(S); break;
       case 'succeed':
-        if (confirm(tr('Aposentar e passar o bastão para o herdeiro? Seu personagem sai de cena e a próxima geração começa agora.',
-          'Retire and pass the torch to your heir? Your character leaves the stage and the next generation starts now.'))) G.legacy.succeed(S, 'aposentadoria');
+        if (confirm(tr('Aposentar e passar o bastão para o herdeiro? Seu personagem sai de cena e a próxima geração começa agora. Metade da parte do herdeiro vai agora; a outra metade fica com você e vira herança quando você morrer.',
+          'Retire and pass the torch to your heir? Your character leaves the stage and the next generation starts now. Half of the heir\'s share goes now; the other half stays with you and becomes an inheritance when you die.'))) G.legacy.succeed(S, 'aposentadoria');
         break;
       case 'legacy-up': G.legacy.buyUpgrade(S, id); break;
       case 'chart': zoom = id; break;
@@ -1854,6 +2248,26 @@
       case 'tt-stop': G.politics.stopThinkTank(S); break;
       case 'ent-join': G.politics.joinEntity(S, id); break;
       case 'ent-leave': G.politics.leaveEntity(S, id); break;
+      case 'run': {
+        const N = G.nation;
+        const plat = ($('pr-side') || {}).value || (S.nation.president && S.nation.president.platform), budget = parseMoney(($('pr-budget') || {}).value || '');
+        if (budget < N.minBudget(S)) G.news(tr(`A verba mínima de campanha é ${f.money(N.minBudget(S))}.`, `The minimum campaign budget is ${f.money(N.minBudget(S))}.`), 'info');
+        else N.launch(S, plat, budget);
+        break;
+      }
+      case 'fam-approach': G.families.approach(S, id); break;
+      case 'kid-time': G.dynasty.spendTime(S, id); break;
+      case 'kid-heir': G.dynasty.setHeir(S, id); break;
+      case 'fam-ally': G.families.ally(S, id); break;
+      case 'fam-break': G.families.breakAlly(S, id); break;
+      case 'fam-inv': G.families.investigate(S, id); break;
+      case 'fam-attack':
+        if (confirm(tr('Atacar essa família na mídia? A relação vira guerra e a retaliação é provável.', 'Attack this family in the media? The relationship turns into war and retaliation is likely.'))) G.families.attack(S, id);
+        break;
+      case 'reform': G.nation.proposeReform(S, id); break;
+      case 'summit': G.nation.summit(S); break;
+      case 'unseat': G.nation.unSeat(S); break;
+      case 'bc': G.nation.setBC(S, b.checked); break;
       case 'office': G.politics.takeOffice(S, id, ($('p-bc') || {}).value); break;
       case 'vacation': G.life.vacation(S, id); break;
       case 'hobby-start': G.life.startHobby(S, id); break;
@@ -1872,6 +2286,7 @@
           'Take a sabbatical year? You go 12 months without salary, but keep your position.'))) G.work.sabbatical(S);
         break;
       case 'retro-toggle': S.settings.retro = b.checked; break;
+      case 'badges-toggle': S.settings.badges = b.checked; break;
       case 'habit-start': G.social.startHabit(S, id); break;
       case 'habit-drop': G.social.dropHabit(S, id); break;
       case 'social': G.social.doActivity(S, id); break;
@@ -1887,6 +2302,19 @@
       case 'biz-open': G.business.open(S, id); break;
       case 'biz-fin': G.business.open(S, id, true); break;
       case 'biz-hire': G.business.hire(S, id); break;
+      case 'biz-fire': G.business.fire(S, id); break;
+      case 'biz-prepay': {
+        const el = $(`bl-in-${b.dataset.i}`), amt = parseMoney((el || {}).value || '');
+        if (amt > 0 && G.business.prepay(S, +b.dataset.i, amt, b.dataset.mode)) el.value = '';
+        break;
+      }
+      case 'biz-payoff': { const l = G.business.loans(S)[+b.dataset.i]; if (l) G.business.prepay(S, +b.dataset.i, l.bal); break; }
+      case 're-prepay': {
+        const el = $(`rh-in-${b.dataset.i}`), amt = parseMoney((el || {}).value || '');
+        if (amt > 0 && G.realty.prepay(S, +b.dataset.i, amt, b.dataset.mode)) el.value = '';
+        break;
+      }
+      case 're-payoff': { const h = S.realty[+b.dataset.i]; if (h && h.loan) G.realty.prepay(S, +b.dataset.i, h.loan.bal); break; }
       case 'biz-sell': G.business.sell(S, id); break;
       case 'fund-open': G.fund.open(S); break;
       case 'fund-sell':
@@ -1979,6 +2407,12 @@
     else if (el.dataset.set === 'reserve') S.auto.reserve = Math.max(0, parseFloat(el.value.replace(',', '.')) || 0);
     else if (el.dataset.set === 'robot') S.auto.robot = el.value;
     else if (el.dataset.set === 'routine') S.routine = el.value;
+    else if (el.dataset.set === 'focus') G.dynasty.setFocus(S, el.dataset.id, el.value);
+    else if (el.dataset.set === 'surname') { if (el.value.trim()) S.legacy.surname = el.value.trim().slice(0, 30); }
+    else if (el.dataset.set === 'myname') { if (el.value.trim()) S.me.name = el.value.trim().slice(0, 30); }
+    else if (el.dataset.nb) G.nation.setBudget(S, el.dataset.nb, parseFloat(el.value.replace(',', '.')));
+    else if (el.dataset.set === 'stance') G.nation.setStance(S, el.value);
+    else if (el.dataset.set === 'emendas') G.nation.setEmendas(S, el.value);
     else if (el.dataset.set === 'crop') {
       if (G.politics.blind(S)) G.news(BLIND_MSG, 'info');
       else G.agro.setCrop(S, +el.dataset.i, el.value);

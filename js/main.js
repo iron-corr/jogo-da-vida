@@ -28,9 +28,12 @@
       G.fund.monthly(S);
       G.work.monthly(S, c);
       G.social.monthly(S);
+      G.dynasty.monthly(S);
       G.life.monthly(S, c);
       G.choices.monthly(S);
       G.politics.monthly(S, c);
+      G.families.monthly(S);
+      G.nation.monthly(S, c);
       G.work.settle(S);
       G.auto.monthly(S, c);
       G.macro.monthly(S, c);
@@ -70,10 +73,15 @@
       'With your career moving, your social life starts to matter. New tab: Life.'));
     if (G.social.tierIdx(S) >= 2) open('poder', tr('Seu nome começa a circular em Brasília. Nova aba: Poder.', 'Your name starts making the rounds in Brasília. New tab: Power.'));
     if (S.research.agro) open('terras', tr('Você começou a visitar fazendas à venda. Nova aba: Terras.', 'You started visiting farms for sale. New tab: Land.'));
+    if (S.tabs.vida) open('dinastia', tr(`Nova aba: Dinastia, a ${G.dynasty.familyName(S)} (você, cônjuge, filhos, anciãos e parentes).`,
+      `New tab: Dynasty, ${G.dynasty.familyName(S)} (you, spouse, children, elders and relatives).`));
     if (S.tabs.vida) open('lazer', tr('Tempo livre também conta. Nova aba: Lazer (férias, hobbies, saúde e coleções).',
       'Free time counts too. New tab: Leisure (vacations, hobbies, health and collections).'));
     if (S.research.anjo || S.angel.tickets.length) open('startups', tr('Um amigo te chamou para um grupo de investidores-anjo. Nova aba: Startups.',
       'A friend invited you to an angel investor group. New tab: Startups.'));
+    if (S.fam && S.fam.noticed) open('familias', tr('Seu nome começa a aparecer ao lado das famílias mais ricas do país. Nova aba: Famílias.',
+      'Your name starts showing up next to the country\'s richest families. New tab: Families.'));
+    if (S.nation && S.nation.president) open('brasil', tr('Nova aba: Brasil.', 'New tab: Brazil.'));
     if (S.reputation >= 2) open('estilo', tr('Com o emprego firme, dá para pensar em onde morar. (Trabalho → Estilo de vida)',
       'With a steady job, you can think about where to live. (Work → Lifestyle)'));
   };
@@ -107,7 +115,7 @@
     G.popup(G.S, tr('Enquanto você esteve fora', 'While you were away'), [
       [tr('Dias que passaram', 'Days passed'), String(days)],
       [tr('Patrimônio', 'Net worth'), `${G.fmt.money(before)} → ${G.fmt.money(after)}`],
-      ...notable.map(e => `${G.fmt.date(e.d)} · ${e.t}`),
+      ...notable.map(e => `${G.fmt.date(e.d)} · ${G.i18n.show(e.t, e.t2, e.l)}`),
       notable.length ? '' : tr('Nada de muito marcante: o dinheiro trabalhou em silêncio.', 'Nothing remarkable: your money worked quietly.'),
     ].filter(Boolean));
     G.popups[G.popups.length - 1].resume = speed;

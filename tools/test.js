@@ -2,7 +2,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const root = path.join(__dirname, '..');
 const ctx = vm.createContext({ console });
-for (const f of ['i18n', 'rng', 'format', 'calendar', 'data/assets', 'events', 'tax', 'portfolio', 'realty', 'agro', 'angel', 'automation', 'business', 'fund', 'social', 'politics', 'legacy', 'life', 'choices', 'work', 'macro', 'market', 'state'])
+for (const f of ['i18n', 'rng', 'format', 'calendar', 'data/assets', 'data/research', 'research', 'events', 'tax', 'portfolio', 'realty', 'agro', 'angel', 'automation', 'business', 'fund', 'social', 'politics', 'families', 'nation', 'legacy', 'dynasty', 'goals', 'life', 'choices', 'work', 'macro', 'market', 'state'])
   vm.runInContext(fs.readFileSync(path.join(root, 'js', f + '.js'), 'utf8'), ctx);
 const G = ctx.G;
 let ok = true;
@@ -129,9 +129,14 @@ S.routine = 'misto'; S.energy = 100; cash0 = S.cash; S.knowledge = 0; G.work.aut
 eq('piloto misto: estuda e faz hora extra', S.knowledge > 0 && S.cash > cash0 ? 1 : 0, 1);
 
 // 18) piloto desempregado procura emprego mesmo no modo "estudar"
-S = G.newState(18); S.research = { rotina: 1 }; S.routine = 'estudar'; S.job.employed = false; S.reputation = 400;
-for (let d = 0; d < 60 && !S.job.employed; d++) { G.work.daily(S); G.work.autopilot(S); }
+S = G.newState(18); S.research = { rotina: 1 }; S.routine = 'estudar'; S.reputation = 400; G.work.loseJob(S);
+for (let d = 0; d < 360 && !S.job.employed; d++) { S.day++; G.work.daily(S); G.work.autopilot(S); }
 eq('piloto achou emprego', S.job.employed ? 1 : 0, 1);
+eq('piloto: recontratado só depois de 1 mês', S.job.since >= 30 ? 1 : 0, 1);
+const k18 = S.knowledge;
+S = G.newState(181); S.research = { rotina: 1 }; S.routine = 'hora_extra'; G.work.loseJob(S);
+S.day++; G.work.daily(S); G.work.autopilot(S);
+eq('piloto estuda enquanto não pode procurar emprego', S.knowledge > 0 ? 1 : 0, 1);
 
 // 19) dívida acima do limite do cheque especial paga 2% a.m., não 8%
 S = G.newState(19); S.cash = -100000; S.job.employed = false; S.job.retired = true;
@@ -242,14 +247,30 @@ eq('PL com herdeiro', G.legacy.points(S), 36);
 
 // 31) sucessão: mundo continua, herança de 2% − ITCMD, pesquisas de berço
 S = G.newState(31); S.day = 20000; S.cash = 1e8; S.social.family.kids = 1; S.legacy.up = { educacao: 1 };
+G.dynasty.children(S)[0].born = S.day - 25 * 360;
 const selic31 = S.macro.selic, lp31 = G.legacy.points(S);
 const heir = G.legacy.succeed(S, 'aposentadoria');
 eq('herdeiro no mesmo dia do mundo', heir.day, 20000);
 eq('mesma Selic', heir.macro.selic, selic31);
-eq('herança 30% com 8% de ITCMD', heir.cash - 300 * heir.macro.priceIndex, 1e8 * 0.3 * 0.92);
+eq('aposentadoria: doação em vida de metade dos 30%, com ITCMD', heir.cash - 300 * heir.macro.priceIndex, 1e8 * 0.3 * 0.5 * 0.92);
+const elder31 = heir.legacy.elders[0];
+eq('a outra metade fica com a geração aposentada', elder31.estate, 1e8 * 0.3 * 0.5);
+elder31.cost = 0; const est31 = elder31.estate, infl31 = heir.macro.infl;
+G.legacy.eldersMonthly(heir);
+eq('patrimônio aposentado rende inflação + 3% a.a.', elder31.estate / est31, Math.pow((1 + infl31) * 1.03, 1 / 12));
+const day31 = heir.day; heir.day = elder31.dies; const cash31 = heir.cash, est31b = elder31.estate * Math.pow((1 + heir.macro.infl) * 1.03, 1 / 12);
+G.legacy.eldersMonthly(heir);
+eq('na morte, herança do que sobrou, com ITCMD', heir.cash - cash31, est31b * 0.92);
+eq('geração aposentada sai da lista', heir.legacy.elders.length, 0);
+eq('dinastia registra a idade da morte', heir.legacy.history[0].died > 22 ? 1 : 0, 1);
+heir.day = day31;
+S = G.newState(311); S.day = 20000; S.cash = 1e8; S.social.family.kids = 1;
+const heirD = G.legacy.succeed(S, 'morte');
+eq('morte: herança inteira de uma vez', heirD.cash - 300 * heirD.macro.priceIndex, 1e8 * 0.3 * 0.92);
+eq('morte: ninguém fica com patrimônio', heirD.legacy.elders.length, 0);
 eq('PL somados', heir.legacy.lp, lp31);
 eq('geração 2', heir.legacy.generation, 2);
-eq('idade do herdeiro', G.legacy.age(heir), 22);
+eq('herdeiro assume com a idade real (25)', G.legacy.age(heir), 25);
 eq('educação de berço', heir.research.rotina && heir.research.edu_fin ? 1 : 0, 1);
 eq('carreira zerada', heir.job.level, 0);
 
@@ -369,6 +390,16 @@ eq('alvos preservados', heir42.auto.targets.ibov, 60);
 eq('piloto preservado', heir42.routine === 'misto' ? 1 : 0, 1);
 eq('reinvestir preservado', heir42.settings.reinvest ? 1 : 0, 1);
 
+// 42b) recolocação: no mínimo 1 mês depois da demissão, uma rodada de currículos por dia
+S = G.newState(421); S.reputation = 100; S.energy = 1000; G.work.loseJob(S);
+const chance421 = G.rng.chance; G.rng.chance = () => true;
+G.work.search(S); eq('sem contratação no 1º mês', S.job.employed ? 1 : 0, 0);
+S.day += 29; G.work.search(S); eq('nem no 29º dia', S.job.employed ? 1 : 0, 0);
+S.day += 1; G.work.search(S); eq('contratação possível a partir do 30º dia', S.job.employed ? 1 : 0, 1);
+G.work.loseJob(S); S.day += 30; G.rng.chance = () => false; G.work.search(S); G.rng.chance = () => true; G.work.search(S);
+eq('só uma rodada de currículos por dia', S.job.employed ? 1 : 0, 0);
+G.rng.chance = chance421;
+
 // 43) pausa automática em evento importante
 S = G.newState(43); S.speed = 5; G.alert(S, 'teste');
 eq('alerta pausa o jogo', S.speed, 0);
@@ -382,7 +413,7 @@ S.pol.passed.subsidio = { sector: 'varejo', until: S.day + 1440 };
 eq('padaria subsidiada lucra +15%', G.business.monthlyProfit(S) / p44, 1.15);
 
 // 45) bem-estar: base 50 − stress/2, casado +8, pet +4; vira pontos de legado
-S = G.newState(45); S.social.stress = 20; S.social.family.married = true; S.life.pet = { name: 'X', born: 0, dies: 1e9 };
+S = G.newState(45); S.lifestyle = 1; S.social.stress = 20; S.social.family.married = true; S.life.pet = { name: 'X', born: 0, dies: 1e9 };
 eq('índice de bem-estar', G.life.wellbeing(S), 50 - 10 + 8 + 4);
 S.life.wellSum = 70 * 720; S.life.wellN = 720; S.day = 60 * 360;
 eq('PL por uma vida boa (média 70, 60 anos)', G.life.wellPoints(S), 22);
@@ -400,6 +431,32 @@ G.realty.buy(S, 'kitnet', false); G.life.moveIn(S, 0);
 eq('custo de vida morando no próprio imóvel', G.work.cost(S) / cost47, 0.6);
 eq('imóvel onde mora não rende aluguel', G.realty.monthlyNet(S).rent, 0);
 S.lifestyle = 5; eq('cobertura: kitnet pequena demais, sem desconto', G.life.homeOk(S) ? 1 : 0, 0);
+S.lifestyle = 0; eq('condomínio e IPTU da casa entram nos gastos do mês', G.realty.monthlyNet(S).upkeep, 180000 * 0.001);
+eq('gastos do mês = custo de vida + condomínio/IPTU', G.work.outflow(S), G.work.cost(S) + 180);
+// o imóvel mínimo acompanha família e cidade: a mesma kitnet não serve para casal com 2 filhos em SP
+S.social.family.married = true; S.social.family.kids = 2; S.life.city = 'sp';
+eq('kitnet pequena para família em SP', G.life.homeOk(S) ? 1 : 0, 0);
+eq('imóvel mínimo = 80× o custo pagando aluguel', G.life.homeMin(S) / G.work.rentCost(S), 80);
+
+// 47b) a família precisa caber onde mora
+S = G.newState(471); S.cash = 1e7; S.lifestyle = 1; // kitnet: até 2 pessoas
+S.social.family.married = true; S.social.family.kids = 2;
+eq('família de 4 numa kitnet: 2 a mais', G.work.crowded(S), 2);
+const roomy = G.newState(471); Object.assign(roomy, { cash: 1e7, lifestyle: 3 }); roomy.social.family.married = true; roomy.social.family.kids = 2;
+G.social.monthly(S); G.social.monthly(roomy);
+eq('aperto: +6 de stress no mês (3 por pessoa a mais)', S.social.stress - roomy.social.stress, 6);
+eq('aperto: −10 de bem-estar (e −3 pelo stress a mais)', G.life.wellbeing(roomy) - G.life.wellbeing(S), 10 + 3);
+G.work.setLifestyle(S, 3); eq('mudou para apartamento de 2 quartos', S.lifestyle, 3);
+eq('família de 4 cabe no apartamento de 2 quartos', G.work.crowded(S), 0);
+G.work.setLifestyle(S, 1); eq('não dá para voltar para a kitnet com 4 pessoas', S.lifestyle, 3);
+S.research.imoveis = true; S.market.prices.imob = 100;
+G.realty.buy(S, 'kitnet', false); G.life.moveIn(S, 0);
+eq('não dá para morar numa kitnet própria com 4 pessoas', S.realty[0].home ? 1 : 0, 0);
+eq('motivo: família não cabe', G.life.homeProblem(S, S.realty[0]) === 'familia' ? 1 : 0, 1);
+G.realty.buy(S, 'galpao', false);
+eq('galpão não serve de casa', G.life.homeProblem(S, S.realty[1]) === 'comercial' ? 1 : 0, 1);
+G.realty.buy(S, 'casa', false); G.life.moveIn(S, 2);
+eq('casa em condomínio própria serve para 4 pessoas', G.life.homeOk(S) ? 1 : 0, 1);
 
 // 48) coleção entra no patrimônio; leilão cobra 10% e IR sobre o ganho
 S = G.newState(48); S.cash = 100000; const nw48 = G.portfolio.netWorth(S);
@@ -434,6 +491,161 @@ G.life.vacation(S, 'praia');
 eq('stress −15 nas férias', S.social.stress, 25);
 eq('sem estudar de férias', G.work.canAct(S, 1) ? 1 : 0, 0);
 G.life.vacation(S, 'europa'); eq('só uma viagem por ano', S.life.bucket.europa ? 1 : 0, 0);
+
+// 60) famílias: ranking, guerra de preços, ataque e aliança
+S = G.newState(60);
+eq('10 famílias no ranking, mais a sua', G.families.ranking(S).length, 11);
+eq('você começa em último', G.families.myRank(S), 11);
+S.cash = 1e10;
+G.business.open(S, 'padaria'); S.research.empreendedorismo = true; G.business.open(S, 'padaria');
+const p60 = G.business.monthlyProfit(S);
+S.fam.priceWar = { sector: 'varejo', until: S.day + 180, by: 'teixeira' };
+eq('guerra de preços: −20% no lucro do setor', G.business.monthlyProfit(S) / p60, 0.8);
+S.fam.priceWar = null;
+S.pol.influence = 100; S.social.prestige = 1000;
+G.families.attack(S, 'duarte'); eq('sem dossiê nem mídia grande, não dá para atacar', S.pol.influence, 100);
+G.families.st(S, 'duarte').dossie = true; const w60 = G.families.st(S, 'duarte').w;
+G.families.attack(S, 'duarte');
+eq('ataque com dossiê derruba 10% a 25% do patrimônio', w60 > G.families.st(S, 'duarte').w * 1.09 ? 1 : 0, 1);
+eq('atacada vira rival', G.families.relation(S, 'duarte') === 'rival' ? 1 : 0, 1);
+G.families.st(S, 'nogueira').att = 50; G.families.ally(S, 'nogueira');
+eq('aliança com relação ≥ 40', G.families.st(S, 'nogueira').ally ? 1 : 0, 1);
+eq('aliança custa 30 de influência', S.pol.influence, 100 - 20 - 30);
+
+// 61) presidência: requisitos, vitória, blind trust, mandato e sucessão
+S = G.newState(61);
+eq('recém-chegado não pode ser candidato', G.nation.requirements(S).every(r => r.ok) ? 1 : 0, 0);
+S.day = 40 * 360 + 60; // março de 2066, ano eleitoral
+Object.assign(S, { cash: 1e10 }); S.birthDay = 0; S.social.prestige = 900; S.pol.influence = 800; S.pol.image = 60;
+S.research.presidencia = true; G.legacy.flag(S, 'cargo');
+eq('com tudo, pode concorrer', G.nation.canRun(S) ? 1 : 0, 1);
+G.nation.launch(S, 'austero', 3e8);
+eq('campanha lançada', S.nation.campaign ? 1 : 0, 1);
+eq('acima do teto oficial vira caixa 2', S.nation.campaign.dirty, 3e8 - 150e6);
+const normal61 = G.rng.normal; G.rng.normal = () => 5; // voto garantido
+S.day = 40 * 360 + 300; G.politics.runElection(S); G.rng.normal = normal61;
+eq('eleito presidente', G.nation.isPresident(S) ? 1 : 0, 1);
+eq('plataforma do presidente governa', S.macro.policy === 'austero' ? 1 : 0, 1);
+eq('presidente opera em blind trust', G.politics.blind(S) ? 1 : 0, 1);
+eq('mandato termina em janeiro, 4 anos depois da posse', G.cal.of(S.nation.president.until).year, 2071);
+S.social.family.kids = 1; const heir61 = G.legacy.succeed(S, 'morte');
+eq('morte do presidente encerra o mandato', G.nation.isPresident(heir61) ? 1 : 0, 0);
+eq('o país continua no herdeiro', heir61.nation === S.nation ? 1 : 0, 1);
+
+// 62) dívida: juros acima do crescimento fazem a dívida subir; superávit a segura
+S = G.newState(62); const n62 = S.nation; n62.president = { since: 0, until: 1e9, term: 1, platform: 'moderado' };
+n62.stance = 2; const d62 = n62.debt; for (let m = 0; m < 12; m++) G.nation.monthly(S, { month: 3, year: 2027 });
+eq('gasto forte aumenta a dívida', n62.debt > d62 ? 1 : 0, 1);
+
+// 63) dinastia: filhos com nome e aptidões, educação, saída de casa, herdeiro escolhido e parentes
+S = G.newState(63); S.cash = 1e8; G.social.marry(S, false);
+eq('cônjuge tem nome', S.social.family.spouse ? 1 : 0, 1);
+S.social.family.pregnant = { due: S.day }; G.social.kidMonthly(S);
+const c63 = G.dynasty.children(S)[0];
+eq('filho nasce com nome e sonho', c63.name && c63.dream ? 1 : 0, 1);
+G.dynasty.setFocus(S, c63.id, 'pol'); c63.apt.pol = 100; c63.dream = 'pol';
+const cash63 = S.cash; G.dynasty.monthly(S);
+eq('foco na educação custa R$ 3 mil/mês', cash63 - S.cash, 3000);
+eq('habilidade cresce em direção à aptidão (1,6% ao mês com foco)', c63.skill.pol, 1.6);
+eq('família de 3 em casa', G.social.familySize(S), 3);
+S.day += 22 * 360; eq('aos 22 o filho sai de casa', G.social.familySize(S), 2);
+S.social.family.kids = 2; const c63b = G.dynasty.children(S)[0]; // o segundo filho entra no começo da lista
+c63.skill.pol = 80; G.dynasty.setHeir(S, c63.id);
+const inf63 = G.dynasty.heirBonus(c63).influence;
+const heir63 = G.legacy.succeed(S, 'morte');
+eq('herdeiro escolhido assume', heir63.me.name === c63.name ? 1 : 0, 1);
+eq('habilidade política vira influência (80 × 1,5)', heir63.pol.influence, inf63);
+eq('irmão vira parente da dinastia', heir63.legacy.relatives.some(r => r.name === c63b.name) ? 1 : 0, 1);
+eq('sobrenome continua', heir63.legacy.surname === S.legacy.surname ? 1 : 0, 1);
+
+// 64) forçar uma área longe do sonho desgasta a relação; passar tempo junto recupera
+S = G.newState(64); S.social.family.kids = 1; const c64 = G.dynasty.children(S)[0];
+c64.dream = 'art'; G.dynasty.setFocus(S, c64.id, 'fin'); const chance64 = G.rng.chance; G.rng.chance = () => false;
+for (let m = 0; m < 10; m++) G.dynasty.monthly(S);
+G.rng.chance = chance64;
+eq('10 meses forçando finanças: relação −6', c64.bond, 54);
+S.energy = 100; G.dynasty.spendTime(S, c64.id); eq('passar tempo: +6', c64.bond, 60);
+
+// 65) famílias rivais trocam de líder quando ele morre
+S = G.newState(65); const x65 = S.fam.list.albuquerque, old65 = x65.leader.name; x65.leader.age = x65.leader.dies;
+G.families.monthly(S); eq('novo líder assume', x65.leader.name !== old65 || x65.leader.age < 60 ? 1 : 0, 1);
+
+// 66) jornal nos dois idiomas: cada notícia é gravada também no outro idioma
+S = G.newState(66); S.cash = 1e6; S.research.imoveis = true; S.market.prices.imob = 100; G.realty.buy(S, 'kitnet', false);
+const e66 = S.log[0];
+eq('notícia gravada com a versão em inglês', e66.t2 && /^You bought: downtown studio for R\$ 180,000\./.test(e66.t2) ? 1 : 0, 1);
+eq('versão em português intacta', /^Você comprou: kitnet no centro por R\$ 180\.000\./.test(e66.t) ? 1 : 0, 1);
+
+// 67) próximos passos: um objetivo por eixo, e o caminho até a Presidência passo a passo
+const goal67 = (S, axis) => (G.goals.list(S).find(g => g.axis === axis) || {});
+S = G.newState(67);
+eq('começo: objetivo de carreira aponta a próxima promoção', /^Assistente: faltam/.test(goal67(S, 'carreira').text) ? 1 : 0, 1);
+eq('sem a aba Vida, ainda não há objetivo de poder', goal67(S, 'poder').text ? 1 : 0, 0);
+S.tabs.vida = true;
+eq('primeiro degrau do poder: abrir a aba Poder', goal67(S, 'poder').tab === 'vida' ? 1 : 0, 1);
+eq('família: casar', /^casar/.test(goal67(S, 'familia').text) ? 1 : 0, 1);
+S.social.prestige = 700; S.pol.influence = 500; S.pol.image = 50; S.birthDay = -20 * 360;
+eq('sem cargo público: ocupar um cargo', /^ocupar um cargo público/.test(goal67(S, 'poder').text) ? 1 : 0, 1);
+G.legacy.flag(S, 'cargo');
+eq('com cargo: pesquisar a primeira da cadeia (Etiqueta)', /^pesquisar Etiqueta \(9 pesquisa/.test(goal67(S, 'poder').text) ? 1 : 0, 1);
+for (const id of G.goals.missingChain(S, 'presidencia')) S.research[id] = true;
+S.day = 360; // 2027: fora da janela
+eq('com tudo, fora da janela: mostra a próxima eleição', /2030$/.test(goal67(S, 'poder').text) ? 1 : 0, 1);
+S.day = 4 * 360 + 60; // março de 2030
+eq('na janela: lançar a candidatura', /^lançar a candidatura/.test(goal67(S, 'poder').text) ? 1 : 0, 1);
+S.tabs.poder = true;
+eq('aviso na aba Poder com a candidatura aberta', (G.goals.badges(S).poder || []).length > 0 ? 1 : 0, 1);
+S.knowledge = 1e4; S.reputation = 1e3; S.tabs.conhecimento = true;
+eq('aviso na aba Trabalho quando dá para promover', (G.goals.badges(S).trabalho || []).length, 1);
+eq('patrimônio: próximo marco em reais de 2026', /^R\$ 1,00 mi em reais de 2026/.test(goal67(S, 'patrimonio').text) ? 1 : 0, 1);
+
+// 68) demitir gerente: volta a drenar energia, deixa de pagar a comissão, cobra rescisão
+S = G.newState(68); S.research = { empreendedorismo: 1, gestao_pessoas: 1 }; S.cash = 1e6; S.macro.regime = 'expansao';
+G.business.open(S, 'padaria'); G.business.hire(S, 'padaria');
+const drain68 = G.business.drain(S), prof68 = G.business.monthlyProfit(S), sev68 = G.business.severance(S, 'padaria');
+cash0 = S.cash; G.business.fire(S, 'padaria');
+eq('demitir: sem gerente', G.business.managers(S, 'padaria'), 0);
+eq('demitir: volta a drenar energia', G.business.drain(S) - drain68, 3);
+eq('demitir: lucro sem a comissão de 15%', G.business.monthlyProfit(S) > prof68 ? 1 : 0, 1);
+eq('demitir: rescisão de 3 meses da comissão', cash0 - S.cash, sev68);
+eq('rescisão = 3 × 15% do lucro da unidade', sev68, 3 * 0.15 * G.business.unitProfit(S, G.business.biz('padaria')));
+cash0 = S.cash; G.business.fire(S, 'padaria'); eq('sem gerente, demitir não faz nada', cash0 - S.cash, 0);
+S.research.agro = 1; S.cash = 1e8; G.agro.buy(S, G.agro.LANDS[0].id); G.agro.hire(S, 0);
+const sev68b = G.agro.severance(S, S.agro.lands[0]); cash0 = S.cash; G.agro.fire(S, 0);
+eq('demitir gerente agrícola', S.agro.lands[0].mgr ? 1 : 0, 0);
+eq('rescisão agrícola', cash0 - S.cash, sev68b);
+
+// 69) amortização antecipada do imóvel: ↓ parcela (mesmo prazo), ↓ prazo (mesma parcela), quitar
+S = G.newState(69); S.research = { imoveis: 1, financiamento: 1 }; S.cash = 1e6; S.market.prices.imob = 100;
+G.realty.buy(S, 'apto', true);
+const L69 = S.realty[0].loan, pmt69 = L69.pmt, bal69 = L69.bal;
+cash0 = S.cash; G.realty.prepay(S, 0, 100000, 'pmt');
+eq('amortizar: saldo cai', bal69 - L69.bal, 100000);
+eq('amortizar: caixa cai', cash0 - S.cash, 100000);
+eq('↓ parcela: mesmo prazo', L69.left, 360);
+eq('↓ parcela: nova parcela Price', L69.pmt, G.realty.payment(bal69 - 100000, L69.rate, 360));
+const pmt69b = L69.pmt; G.realty.prepay(S, 0, 50000, 'term');
+eq('↓ prazo: prazo menor', L69.left < 360 ? 1 : 0, 1);
+eq('↓ prazo: parcela não sobe', L69.pmt <= pmt69b + 0.01 ? 1 : 0, 1);
+eq('↓ prazo: parcela quase igual', Math.abs(L69.pmt - pmt69b) < pmt69b * 0.02 ? 1 : 0, 1);
+S.cash = 1000; G.realty.prepay(S, 0, 1e9, 'pmt'); eq('valor limitado ao caixa', S.cash, 0);
+S.cash = 1e6; G.realty.prepay(S, 0, S.realty[0].loan.bal);
+eq('quitar: sem financiamento', S.realty[0].loan ? 1 : 0, 0);
+eq('quitar: conquista de dívida quitada', S.legacy.ach.quitado !== undefined || (S.flags && S.flags.quitado) ? 1 : 0, 1);
+eq('patrimônio em imóveis = valor de mercado', G.realty.equity(S), G.realty.value(S, S.realty[0]));
+
+// 70) amortização antecipada de empréstimo empresarial
+S = G.newState(70); S.research = { empreendedorismo: 1 }; S.cash = 10e6; S.macro.selic = 0.1;
+G.business.open(S, 'fabrica', true);
+const p70 = G.business.monthlyPayments(S);
+G.business.prepay(S, 0, 4e6, 'pmt');
+eq('empresa: dívida cai', G.business.debt(S), 10e6);
+eq('empresa ↓ parcela', G.business.monthlyPayments(S), G.realty.payment(10e6, 0.15, 120));
+const p70b = G.business.monthlyPayments(S); S.cash = 20e6; G.business.prepay(S, 0, 2e6, 'term');
+eq('empresa ↓ prazo: menos meses', G.business.loans(S)[0].left < 120 ? 1 : 0, 1);
+eq('empresa ↓ prazo: parcela não sobe', G.business.monthlyPayments(S) <= p70b + 0.01 ? 1 : 0, 1);
+eq('empresa: parcela menor que a original', G.business.monthlyPayments(S) < p70 ? 1 : 0, 1);
+G.business.prepay(S, 0, G.business.debt(S)); eq('empresa: quitado sai da lista', G.business.loans(S).length, 0);
 
 console.log(ok ? '\nTODOS OK' : '\nHÁ FALHAS');
 process.exitCode = ok ? 0 : 1;

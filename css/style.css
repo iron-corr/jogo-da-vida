@@ -178,3 +178,9 @@ canvas.zoom { cursor: zoom-in; }
 /* Troca de idioma: um link discreto no rodapé */
 #lang-bar { max-width: 1400px; margin: 0 auto; padding: 4px 14px 12px; text-align: right; font-size: 11px; }
 #lang-bar button.link { color: var(--muted); }
+
+/* Próximos passos clicáveis e aviso nas abas */
+button.goal.link { display: block; text-align: left; font-size: 11px; color: var(--muted); padding: 1px 0; }
+button.goal.link:hover { color: var(--link); }
+.goal b { color: var(--fg); font-weight: normal; }
+.tablink .badge { color: var(--warn); margin-left: 2px; font-weight: bold; }

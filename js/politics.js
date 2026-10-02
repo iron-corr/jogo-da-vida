@@ -71,13 +71,13 @@
     }),
     bill: id => BILLS.find(b => b.id === id),
     office: id => OFFICES.find(o => o.id === id),
-    blind: S => !!(S.pol.office && PL.office(S.pol.office.id).blind),
+    blind: S => !!(S.pol.office && PL.office(S.pol.office.id).blind) || (G.nation ? G.nation.blind(S) : false),
     addImage(S, x) { S.pol.image = clamp(S.pol.image + x, -100, 100); },
 
     // ---------- efeitos consultados por outros módulos ----------
     alpha(S, id) {
       if (!S.pol) return 0;
-      let a = (G.macro.POLICIES[S.macro.policy].alpha || {})[id] || 0;
+      let a = ((G.macro.POLICIES[S.macro.policy].alpha || {})[id] || 0) + (G.nation ? G.nation.alpha(S, id) : 0);
       const sub = S.pol.passed.subsidio;
       if (sub && sub.sector === id && S.day < sub.until) a += 0.08;
       if (id === 'imob' && S.pol.passed.credito_imob) a += 0.04;
@@ -113,6 +113,7 @@
         w[k] = p.weight + 0.15 * Math.log10(1 + money / (100000 * pi(S)));
       }
       w.redistributivo += Math.max(0, -S.pol.image) / 200;
+      if (G.families) G.families.electionWeights(S, w);
       if (S.pol.thinkTank) w[S.pol.thinkTank.side] += Math.min(0.25, 0.05 * S.pol.thinkTank.years);
       const total = Object.values(w).reduce((a, b) => a + b, 0);
       for (const k in w) w[k] /= total;
@@ -139,7 +140,15 @@
       S.pol.poll = poll;
     },
     runElection(S) {
-      const m = S.macro, pol = S.pol, winner = G.rng.pick(PL.weights(S));
+      const m = S.macro, pol = S.pol, camp = S.nation && S.nation.campaign;
+      // Candidatura presidencial: se você venceu, sua plataforma assume; se perdeu, ela não vence com outro nome.
+      let winner = G.nation ? G.nation.election(S) : null;
+      if (!winner) {
+        const w = PL.weights(S);
+        if (camp) delete w[camp.platform];
+        winner = G.rng.pick(w);
+      }
+      if (G.families) G.families.afterElection(S, Object.keys(pol.backed).concat(camp ? [camp.platform] : []));
       m.policy = winner;
       G.news(tr(`Resultado das eleições: vence a plataforma ${G.macro.POLICIES[winner].n.toLowerCase()}.`, `Election result: the ${G.macro.POLICIES[winner].n} platform wins.`), 'politica');
       const bw = pol.backed[winner];
@@ -220,8 +229,9 @@
       const o = PL.office(id);
       if (!o || !PL.canTakeOffice(S, o)) return;
       S.pol.office = { id, until: S.day + o.days };
+      G.legacy.flag(S, 'cargo');
       if (o.blind && S.job.employed) {
-        S.job.employed = false;
+        G.work.loseJob(S);
         S.job.retired = true;
       }
       if (id === 'bc') S.pol.bcBias = bias === 'dovish' ? -0.03 : bias === 'hawkish' ? 0.03 : 0;
@@ -239,6 +249,7 @@
     scandalChance: S => Math.min(0.5, S.pol.dirty * 0.03 * (S.research.compliance ? 0.5 : 1) * (S.pol.image < 0 ? 1.5 : 1)),
     scandal(S) {
       const pol = S.pol, soft = PL.hasBigMedia(S) ? 0.5 : 1;
+      pol.lastScandal = S.day;
       const liquid = Math.max(0, S.cash) + G.portfolio.invested(S);
       const fine = liquid * Math.min(0.3, 0.03 + 0.04 * pol.dirty) * (PL.hasBigMedia(S) ? 0.7 : 1);
       S.cash -= fine;

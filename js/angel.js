@@ -4,7 +4,8 @@
 
   // Investimento-anjo (retorno médio ~2,3x em 6-7 anos). O destino de cada startup é sorteado quando a rodada aparece;
   // o jogador só vê um sinal de tração, que é confiável na proporção da due diligence.
-  const PREFIX = ['Agro', 'Pix', 'Log', 'Saúde', 'Edu', 'Pet', 'Casa', 'Frota', 'Nuvem', 'Pay', 'Food', 'Clima', 'Obra', 'Seguro'];
+  const PREFIX = tr(['Agro', 'Pix', 'Log', 'Saúde', 'Edu', 'Pet', 'Casa', 'Frota', 'Nuvem', 'Pay', 'Food', 'Clima', 'Obra', 'Seguro'],
+    ['Agro', 'Pix', 'Log', 'Health', 'Edu', 'Pet', 'Home', 'Fleet', 'Cloud', 'Pay', 'Food', 'Climate', 'Build', 'Insure']);
   const SUFFIX = ['ly', 'io', 'Hub', 'Tech', 'Bank', 'Go', 'Now', 'AI', 'Up', 'Lab', 'Flow', 'Box'];
   const PITCH = tr([
     'marketplace de', 'app para', 'SaaS para gestão de', 'fintech de crédito para', 'plataforma de dados sobre', 'IA que automatiza',
@@ -33,9 +34,10 @@
     const f = fate();
     const acc = (S.research.due_diligence ? 0.85 : 0.5) + (S.social.clubs.golfe ? 0.1 : 0);
     const ticket = Math.max(25000, Math.round((G.portfolio.netWorth(S) * 0.01) / 5000) * 5000);
+    const pitch = `${G.rng.item(PITCH)} ${G.rng.item(TOPIC)}`;
     return {
       name: G.angel.newName(),
-      pitch: `${G.rng.item(PITCH)} ${G.rng.item(TOPIC)}`,
+      pitch, pitch2: G.i18n.other(pitch), pitchL: G.lang,
       ticket, until: S.day + DEAL_DAYS,
       signal: G.rng.chance(acc) ? trueSignal(f.mult) : G.rng.item(SIGNALS),
       mult: f.mult, exit: f.exit,

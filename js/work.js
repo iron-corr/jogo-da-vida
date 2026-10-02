@@ -17,30 +17,37 @@
   ];
 
   const LIFESTYLE = [
-    { n: tr('Quarto dividido', 'Shared room'), cost: 1200, emax: 100, regen: 25 },
-    { n: tr('Kitnet', 'Studio apartment'), cost: 2200, emax: 120, regen: 30 },
-    { n: tr('Apartamento 1 quarto', '1-bedroom apartment'), cost: 3800, emax: 140, regen: 36 },
-    { n: tr('Apartamento 2 quartos + carro', '2-bedroom apartment + car'), cost: 7000, emax: 170, regen: 44 },
-    { n: tr('Casa em condomínio', 'House in a gated community'), cost: 14000, emax: 210, regen: 54 },
-    { n: tr('Cobertura', 'Penthouse'), cost: 30000, emax: 260, regen: 66 },
+    // people = quantas pessoas cabem (você, cônjuge e filhos).
+    { n: tr('Quarto dividido', 'Shared room'), cost: 1200, emax: 100, regen: 25, people: 1 },
+    { n: tr('Kitnet', 'Studio apartment'), cost: 2200, emax: 120, regen: 30, people: 2 },
+    { n: tr('Apartamento 1 quarto', '1-bedroom apartment'), cost: 3800, emax: 140, regen: 36, people: 3 },
+    { n: tr('Apartamento 2 quartos + carro', '2-bedroom apartment + car'), cost: 7000, emax: 170, regen: 44, people: 4 },
+    { n: tr('Casa em condomínio', 'House in a gated community'), cost: 14000, emax: 210, regen: 54, people: 6 },
+    { n: tr('Cobertura', 'Penthouse'), cost: 30000, emax: 260, regen: 66, people: 10 },
   ];
 
   // Ordem de venda automática quando o caixa fica negativo: liquidez primeiro, risco por último.
   const SETTLE_ORDER = ['poupanca', 'tesouro_selic', 'cdb', 'prefixado', 'ipca', 'fii', 'ibov', 'sp500', 'ouro',
     'utilities', 'bancos', 'commodities', 'varejo', 'tech', 'bitcoin', 'altcoins'];
   const OT_COST = 20, STUDY_COST = 15, SEARCH_COST = 20, BURNOUT_DAYS = 5;
+  // Recolocação: processos seletivos levam no mínimo um mês; depois, uma rodada de currículos por dia,
+  // com um quarto da chance antiga (em média, de algumas semanas a alguns meses a mais).
+  const MIN_JOBLESS = 30;
   const money = v => G.fmt.money(v);
 
   const W = G.work = {
-    CAREER, LIFESTYLE, OT_COST, STUDY_COST, SEARCH_COST,
+    CAREER, LIFESTYLE, OT_COST, STUDY_COST, SEARCH_COST, MIN_JOBLESS,
     // Trilha da carreira: corporativo (padrão), startup (salário menor + participação) ou academia (professor).
     TRACKS: { corporativo: { n: tr('Corporativo', 'Corporate'), sal: 1 }, startup: { n: 'Startup', sal: 0.6 }, academia: { n: tr('Professor universitário', 'University professor'), sal: 0.5 } },
     trackMult: S => W.TRACKS[S.job.track || 'corporativo'].sal,
     salaryMult: S => (S.research.negociacao ? 1.1 : 1) * (S.research.mba ? 1.1 : 1) * (S.research.cfa ? 1.15 : 1)
       * (S.job.bonus || 1) * W.trackMult(S) * G.life.salaryMult(S),
     salary: S => CAREER[S.job.level].sal * S.job.wageIndex * W.salaryMult(S),
+    // costMult não inclui a casa própria: rentCost é o custo de vida pagando aluguel; cost já desconta a moradia
+    // quando você mora num imóvel seu grande o bastante (ver life.homeMult).
     costMult: S => (S.research.orcamento ? 0.95 : 1) * (S.research.minimalismo ? 0.9 : 1) * G.social.costMult(S) * G.life.costMult(S),
-    cost: S => LIFESTYLE[S.lifestyle].cost * S.macro.priceIndex * W.costMult(S),
+    rentCost: S => LIFESTYLE[S.lifestyle].cost * S.macro.priceIndex * W.costMult(S),
+    cost: S => W.rentCost(S) * G.life.homeMult(S),
     emax: S => LIFESTYLE[S.lifestyle].emax + (S.research.saude ? 15 : 0) + G.social.emaxAdd(S) - G.life.ageDrain(S),
     regen: S => (LIFESTYLE[S.lifestyle].regen + G.social.regenAdd(S)) * G.social.regenMult(S),
     otGain: S => W.salary(S) / 100,
@@ -61,6 +68,20 @@
       return !!n && S.job.employed && S.knowledge >= n.k && S.reputation >= n.rep;
     },
     moveCost: (S, i) => (i > S.lifestyle ? 2 * LIFESTYLE[i].cost * S.macro.priceIndex : 0),
+    // Quantas pessoas cabem onde você mora: a casa própria (se for residencial) ou o padrão de vida alugado.
+    capacity(S) {
+      const h = G.life.home(S), p = h && G.realty.prop(h.pid);
+      return p && p.people ? p.people : LIFESTYLE[S.lifestyle].people;
+    },
+    // Pessoas a mais do que cabem (0 = cabe todo mundo). Aperto dá stress e derruba o bem-estar.
+    crowded: S => Math.max(0, G.social.familySize(S) - W.capacity(S)),
+    fits: (S, i) => LIFESTYLE[i].people >= G.social.familySize(S),
+    // Avisa quando a família cresce e deixa de caber (chamado no casamento e no nascimento).
+    checkRoom(S) {
+      if (!W.crowded(S)) return;
+      G.news(tr(`A casa ficou apertada: ${G.social.familySize(S)} pessoas onde cabem ${W.capacity(S)}. Hora de mudar (Trabalho → Estilo de vida).`,
+        `Home is getting cramped: ${G.social.familySize(S)} people where ${W.capacity(S)} fit. Time to move (Work → Lifestyle).`), 'bad');
+    },
 
     // Gastar energia com o tanque baixo arrisca burnout.
     spend(S, cost) {
@@ -82,14 +103,22 @@
       W.spend(S, W.studyCost(S));
       S.knowledge += W.studyGain(S);
     },
+    // Primeiro dia em que uma contratação é possível, contado de quando o emprego acabou.
+    hireFrom: S => (S.job.lostAt || 0) + MIN_JOBLESS,
+    // '' se dá para procurar emprego hoje; senão o motivo ('cedo' ou 'hoje').
+    searchBlock: S => (S.day < W.hireFrom(S) ? 'cedo' : S.job.searchDay === S.day ? 'hoje' : ''),
+    loseJob(S) {
+      Object.assign(S.job, { employed: false, jobless: 0, lostAt: S.day });
+    },
     search(S) {
-      if (S.job.employed || !W.canAct(S, SEARCH_COST)) return;
+      if (S.job.employed || W.searchBlock(S) || !W.canAct(S, SEARCH_COST)) return;
       W.spend(S, SEARCH_COST);
+      S.job.searchDay = S.day;
       let p = Math.min(0.5, 0.1 + 0.005 * S.reputation);
       if (S.macro.regime === 'recessao') p /= 2;
       if (S.research.reserva && W.reserveMonths(S) >= 3) p *= 1.5;
       p += 0.03 * G.social.tierIdx(S);
-      if (G.rng.chance(p)) {
+      if (G.rng.chance(p / 4)) {
         Object.assign(S.job, { employed: true, jobless: 0, retired: false, since: S.day, bonus: 1, track: 'corporativo' });
         G.news(tr(`Contratado de novo como ${CAREER[S.job.level].t}.`, `Hired again as ${CAREER[S.job.level].t}.`), 'good');
       }
@@ -97,15 +126,14 @@
     // Renda que entra sem trabalhar: juros, dividendos, aluguéis, empresas e gestora.
     passiveIncome(S) {
       const re = G.realty.monthlyNet(S);
-      return G.portfolio.monthlyYield(S) + re.rent - re.pmt + G.business.monthlyProfit(S) - G.business.monthlyPayments(S) + G.agro.monthlyExpected(S) + (S.fund ? S.fund.lastProfit : 0);
+      return G.portfolio.monthlyYield(S) + re.rent - re.pmt - re.upkeep + G.business.monthlyProfit(S) - G.business.monthlyPayments(S) + G.agro.monthlyExpected(S) + (S.fund ? S.fund.lastProfit : 0);
     },
     fireNumber: S => 25 * 12 * W.cost(S),
     canRetire: S => !!S.research.fire && S.job.employed && W.passiveIncome(S) >= W.cost(S),
     retire(S) {
       if (!W.canRetire(S)) return;
-      S.job.employed = false;
+      W.loseJob(S);
       S.job.retired = true;
-      S.job.jobless = 0;
       G.legacy.flag(S, 'fire');
       G.news(tr('Você pediu demissão para viver de renda. Seu tempo agora é seu.', 'You quit to live off your income. Your time is now your own.'), 'story');
     },
@@ -132,6 +160,7 @@
 
     setLifestyle(S, i) {
       if (i === S.lifestyle || !LIFESTYLE[i]) return;
+      if (i < S.lifestyle && !W.fits(S, i)) return; // não dá para reduzir para onde a família não cabe
       const c = W.moveCost(S, i);
       if (S.cash < c) return;
       S.cash -= c;
@@ -154,8 +183,8 @@
       if (!S.research.rotina || !mode || mode === 'off' || S.burnout > 0 || G.life.away(S)) return;
       const floor = W.emax(S) * 0.25;
       for (let turn = 0; turn < 50; turn++) {
-        const jobless = !S.job.employed && !S.job.retired;
-        const study = !jobless && (mode === 'estudar' || (mode === 'misto' && turn % 2 === 0) || S.job.retired || !!S.job.sabbatical);
+        const jobless = !S.job.employed && !S.job.retired && !W.searchBlock(S);
+        const study = !jobless && (!S.job.employed || mode === 'estudar' || (mode === 'misto' && turn % 2 === 0) || S.job.retired || !!S.job.sabbatical);
         const act = jobless ? 'search' : study ? 'study' : 'overtime';
         const cost = study ? W.studyCost(S) : act === 'overtime' ? OT_COST : SEARCH_COST;
         if (S.energy - cost < floor) break;
@@ -225,8 +254,7 @@
       }
 
       if (j.employed && !j.sabbatical && G.rng.chance(G.macro.REGIMES[m.regime].layoff * (j.track === 'academia' ? 0.2 : j.track === 'startup' ? 2 : 1))) {
-        j.employed = false;
-        j.jobless = 0;
+        W.loseJob(S);
         G.alert(S, tr('Você foi demitido. Uma reserva de emergência faria diferença agora.', 'You were laid off. An emergency fund would make a difference now.'), 'bad');
       }
     },
@@ -234,8 +262,10 @@
     // Tudo que sai do caixa todo mês: custo de vida, financiamentos, clubes, escola e política.
     outflow(S) {
       const PL = G.politics;
-      return W.cost(S) + G.realty.monthlyNet(S).pmt + G.business.monthlyPayments(S) + G.social.clubFees(S) + G.social.schoolCost(S)
-        + PL.mediaUpkeep(S) + PL.thinkTankCost(S) + PL.entityFees(S) + G.social.partilhaPayment(S) + G.agro.monthlyCost(S) + G.life.monthlyCost(S);
+      const re = G.realty.monthlyNet(S);
+      return W.cost(S) + re.pmt + re.upkeep + G.business.monthlyPayments(S) + G.social.clubFees(S) + G.social.schoolCost(S)
+        + PL.mediaUpkeep(S) + PL.thinkTankCost(S) + PL.entityFees(S) + G.social.partilhaPayment(S) + G.agro.monthlyCost(S) + G.life.monthlyCost(S)
+        + G.dynasty.focusCost(S);
     },
 
     // Fecha o mês depois de todas as cobranças: resgata a reserva líquida, depois vende o resto da carteira

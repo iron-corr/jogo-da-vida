@@ -4,9 +4,12 @@
 
   // Imóveis físicos. O preço segue o índice imobiliário (G.ASSETS.imob) a partir do valor base.
   // yield = aluguel bruto anual; vacate = chance mensal de o inquilino sair.
+  // people = quantas pessoas moram nele (só os residenciais servem de casa própria).
   G.PROPERTIES = [
-    { id: 'kitnet', n: tr('Kitnet no centro', 'Downtown studio'), base: 180000, yield: 0.06, vacate: 0.04 },
-    { id: 'apto', n: tr('Apartamento de 2 quartos', '2-bedroom apartment'), base: 450000, yield: 0.045, vacate: 0.025 },
+    { id: 'kitnet', n: tr('Kitnet no centro', 'Downtown studio'), base: 180000, yield: 0.06, vacate: 0.04, people: 2 },
+    { id: 'apto', n: tr('Apartamento de 2 quartos', '2-bedroom apartment'), base: 450000, yield: 0.045, vacate: 0.025, people: 4 },
+    { id: 'casa', n: tr('Casa em condomínio', 'House in a gated community'), base: 1800000, yield: 0.04, vacate: 0.03, people: 6 },
+    { id: 'cobertura', n: tr('Cobertura', 'Penthouse'), base: 4000000, yield: 0.035, vacate: 0.04, people: 10 },
     { id: 'sala', n: tr('Sala comercial', 'Office suite'), base: 700000, yield: 0.065, vacate: 0.05 },
     { id: 'galpao', n: tr('Galpão logístico', 'Logistics warehouse'), base: 3000000, yield: 0.08, vacate: 0.03 },
     { id: 'predio', n: tr('Prédio corporativo', 'Office building'), base: 25000000, yield: 0.07, vacate: 0.04 },
@@ -24,7 +27,7 @@
   const index = S => S.market.prices.imob / 100;
 
   const R = G.realty = {
-    ITBI, BROKER, DOWN,
+    ITBI, BROKER, DOWN, VACANT_COST,
     prop,
     price: (S, p) => p.base * index(S),
     loanRate: S => S.macro.selic + G.politics.loanSpread(S),
@@ -32,6 +35,41 @@
     payment(balance, annualRate, months) {
       const r = Math.pow(1 + annualRate, 1 / 12) - 1;
       return (balance * r) / (1 - Math.pow(1 + r, -months));
+    },
+    // Meses para zerar o saldo pagando a parcela pmt (inverso da tabela Price).
+    termFor(balance, annualRate, pmt) {
+      const r = Math.pow(1 + annualRate, 1 / 12) - 1;
+      if (pmt <= balance * r) return Infinity;
+      return Math.max(1, Math.ceil(-Math.log(1 - (r * balance) / pmt) / Math.log(1 + r)));
+    },
+    // Amortização antecipada: abate o saldo e reduz a parcela (mode 'pmt', mesmo prazo) ou o prazo (mode 'term', mesma parcela).
+    // Sem valor (ou valor acima do saldo), quita tudo o que o caixa cobrir.
+    prepay(S, i, amount, mode = 'pmt') {
+      const h = S.realty[i], l = h && h.loan;
+      if (!l || h.selling) return 0;
+      const amt = Math.min(amount > 0 ? amount : l.bal, l.bal, Math.max(0, S.cash));
+      if (amt <= 0) return 0;
+      S.cash -= amt;
+      l.bal -= amt;
+      const p = prop(h.pid);
+      if (l.bal < 1) {
+        h.loan = null;
+        G.legacy.flag(S, 'quitado');
+        G.news(tr(`Você quitou antecipadamente o financiamento: ${p.n.toLowerCase()} agora é 100% seu (${money(amt)}).`,
+          `You paid off the mortgage early: the ${p.n.toLowerCase()} is now 100% yours (${money(amt)}).`), 'good');
+        return amt;
+      }
+      if (mode === 'term') {
+        l.left = Math.min(l.left, R.termFor(l.bal, l.rate, l.pmt));
+        l.pmt = R.payment(l.bal, l.rate, l.left);
+        G.news(tr(`Amortização de ${money(amt)} (${p.n.toLowerCase()}): faltam ${l.left} meses, parcela de ${money(l.pmt)}.`,
+          `Prepayment of ${money(amt)} (${p.n.toLowerCase()}): ${l.left} months left, payment of ${money(l.pmt)}.`), 'good');
+      } else {
+        l.pmt = R.payment(l.bal, l.rate, l.left);
+        G.news(tr(`Amortização de ${money(amt)} (${p.n.toLowerCase()}): parcela cai para ${money(l.pmt)}.`,
+          `Prepayment of ${money(amt)} (${p.n.toLowerCase()}): payment drops to ${money(l.pmt)}.`), 'good');
+      }
+      return amt;
     },
     quote(S, p, financed) {
       const price = R.price(S, p);
@@ -44,14 +82,16 @@
     equity(S) {
       return S.realty.reduce((s, h) => s + R.value(S, h) - (h.loan ? h.loan.bal : 0), 0);
     },
-    // Fluxo mensal esperado: aluguel líquido dos imóveis ocupados menos parcelas.
+    // Fluxo mensal esperado: aluguel líquido dos imóveis ocupados, parcelas e condomínio + IPTU
+    // (pagos pelo dono no imóvel vago e na casa onde mora; no alugado, quem paga é o inquilino).
     monthlyNet(S) {
-      let rent = 0, pmt = 0;
+      let rent = 0, pmt = 0, upkeep = 0;
       for (const h of S.realty) {
         if (h.occupied && !h.selling && !h.home) rent += R.rent(S, h) * (1 - ADMIN) * 0.85;
+        if (h.home || !h.occupied) upkeep += R.value(S, h) * VACANT_COST;
         if (h.loan) pmt += h.loan.pmt;
       }
-      return { rent, pmt };
+      return { rent, pmt, upkeep };
     },
 
     buy(S, pid, financed) {

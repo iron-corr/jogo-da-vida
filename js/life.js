@@ -54,7 +54,10 @@
       d: tr('Salário −10%, mas mar todo dia: menos stress e mais bem-estar.', 'Salary −10%, but the sea every day: less stress and more well-being.') },
   };
   const HOME_SHARE = 0.4; // parte do custo de vida que é moradia
-  const HOME_MIN = 60;    // o imóvel precisa valer 60× o custo mensal do padrão
+  // O imóvel precisa valer 80× o custo de vida mensal pagando aluguel (padrão, família, cidade e hábitos incluídos):
+  // assim o aluguel que se deixa de pagar (40% do custo) equivale a 0,5% ao mês do valor do imóvel, ~6% ao ano,
+  // em linha com o aluguel dos imóveis residenciais do jogo (kitnet 6%, apartamento 4,5%).
+  const HOME_MIN = 80;
 
   const SECOND = [
     { id: 'praia', n: tr('Casa de praia', 'Beach house'), base: 900000 },
@@ -72,7 +75,7 @@
   const PET_COST = 400, PET_ADOPT = 2000;
 
   const L = G.life = {
-    HOBBIES, COLLECTIONS, LOTS, DESTINATIONS, CITIES, SECOND, PLANS, HOME_MIN,
+    HOBBIES, COLLECTIONS, LOTS, DESTINATIONS, CITIES, SECOND, PLANS, HOME_MIN, HOME_SHARE,
     init: () => ({
       hobbies: {}, collections: [], second: [], away: 0, vacYear: null, lastDest: null, bucket: {},
       city: 'bh', health: 'nenhum', healthBonus: false, pet: null,
@@ -88,9 +91,9 @@
     costMult(S) {
       let m = L.city(S).cost;
       if (S.life.hobbies.culinaria) m *= HOBBIES.culinaria.costMult;
-      if (L.homeOk(S)) m *= 1 - HOME_SHARE;
       return m;
     },
+    homeMult: S => (L.homeOk(S) ? 1 - HOME_SHARE : 1),
     medMult: S => PLANS[S.life.health].med,
     // Perda de energia máxima com a idade: 1 por ano depois dos 45, até 30. Exercício ou corrida cortam pela metade.
     ageDrain(S) {
@@ -119,15 +122,23 @@
 
     // ---------- casa própria ----------
     home: S => S.realty.find(h => h.home),
-    homeMin: S => HOME_MIN * G.work.LIFESTYLE[S.lifestyle].cost * pi(S),
+    homeMin: S => HOME_MIN * G.work.rentCost(S),
+    // Um imóvel serve de casa se for residencial, couber a família e valer o bastante para o padrão de vida.
+    // Devolve '' se serve, ou o motivo: 'comercial', 'familia' ou 'valor'.
+    homeProblem(S, h) {
+      const p = G.realty.prop(h.pid);
+      if (!p.people) return 'comercial';
+      if (p.people < G.social.familySize(S)) return 'familia';
+      return G.realty.value(S, h) < L.homeMin(S) ? 'valor' : '';
+    },
     homeOk(S) {
       const h = L.home(S);
-      return !!h && G.realty.value(S, h) >= L.homeMin(S);
+      return !!h && !L.homeProblem(S, h);
     },
     moveIn(S, i) {
       const h = S.realty[i];
       if (!h || h.selling || h.occupied || h.home) return;
-      if (G.realty.value(S, h) < L.homeMin(S)) return;
+      if (L.homeProblem(S, h)) return;
       for (const x of S.realty) x.home = false;
       h.home = true;
       G.social.addStress(S, -5);
@@ -246,6 +257,7 @@
       for (const id in lf.hobbies) w += HOBBIES[id].well * (lf.hobbies[id].lastRate ?? 1);
       if (!S.job.employed && !S.job.retired) w -= 10;
       if (S.cash < 0) w -= 10;
+      w -= 5 * G.work.crowded(S);
       return clamp(w, 0, 100);
     },
     avgWell: S => (S.life && S.life.wellN ? S.life.wellSum / S.life.wellN : 0),
@@ -341,7 +353,7 @@
       if (!was || S.settings.retro === false) return;
       const year = c.year - 1, d = k => now[k] - was[k];
       const pick = kind => S.log.find(e => e.d >= was.day && e.k === kind);
-      const marks = [pick('unlock'), pick('good'), pick('bad')].filter(Boolean).map(e => `${G.fmt.date(e.d)} · ${e.t}`);
+      const marks = [pick('unlock'), pick('good'), pick('bad')].filter(Boolean).map(e => `${G.fmt.date(e.d)} · ${G.i18n.show(e.t, e.t2, e.l)}`);
       const growth = was.real > 0 ? now.real / was.real - 1 : 0;
       const verdict = well >= 70 ? tr('Um ano bom de viver.', 'A good year to be alive.') : well >= 50 ? tr('Um ano razoável.', 'A decent year.')
         : well >= 35 ? tr('Um ano pesado.', 'A heavy year.') : tr('Um ano difícil, daqueles que a gente quer esquecer.', 'A hard year, the kind you want to forget.');

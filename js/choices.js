@@ -100,7 +100,7 @@
       id: 'credito', title: tr('Levaram o seu crédito', 'Someone took your credit'), cd: 720, weight: 2,
       when: S => employed(S),
       make: () => ({}),
-      text: () => tr('Um colega apresentou o seu projeto como se fosse dele, na frente da diretoria.', 'A coworker presented your project as his own, in front of the board.'),
+      text: () => tr('Um colega apresentou o seu projeto como se fosse dele, na frente da diretoria.', 'A coworker presented your project as their own, in front of the board.'),
       options: [
         { label: tr('Confrontar', 'Confront'), hint: tr('+3 de reputação, +8 de stress', '+3 reputation, +8 stress'), apply(S) {
           S.reputation += 3;
@@ -116,7 +116,7 @@
       when: S => employed(S) && S.job.level >= 5,
       make: S => ({ x: 6 * G.work.salary(S) }),
       text: (S, d) => tr(`Um fornecedor oferece ${money(d.x)} para você aprovar o contrato dele sem olhar muito.`,
-        `A supplier offers you ${money(d.x)} to approve his contract without looking too closely.`),
+        `A supplier offers you ${money(d.x)} to approve their contract without looking too closely.`),
       options: [
         { label: tr('Aceitar', 'Accept'), hint: tr('+ caixa, + sujeira', '+ cash, + dirt'), apply(S, d) {
           S.cash += d.x;
@@ -164,6 +164,100 @@
       def: 1,
     },
   ];
+
+  // ---------- presidência ----------
+  const pres = S => G.nation.isPresident(S);
+  const nat = S => S.nation;
+  const adj = (S, k, v) => { const n = nat(S); n[k] = Math.max(0.05, Math.min(0.95, n[k] + v)); };
+  CHOICES.push(
+    {
+      id: 'greve', title: tr('Greve dos caminhoneiros', 'Truckers\' strike'), cd: 720, weight: 3, when: pres,
+      make: () => ({}),
+      text: () => tr('Caminhoneiros param as estradas contra o preço do diesel. Faltam combustível e comida nas cidades.',
+        'Truckers block the highways over diesel prices. Cities are running short of fuel and food.'),
+      options: [
+        { label: tr('Subsidiar o diesel', 'Subsidize diesel'), hint: tr('aprovação +, dívida +0,3% do PIB', 'approval +, debt +0.3% of GDP'), apply(S) {
+          nat(S).debt += 0.003; adj(S, 'approval', 0.04);
+          G.news(tr('O governo subsidiou o diesel e a greve acabou.', 'The government subsidized diesel and the strike ended.'), 'politica');
+        } },
+        { label: tr('Não ceder', 'Hold firm'), hint: tr('aprovação −, crescimento sofre', 'approval −, growth suffers'), apply(S) {
+          adj(S, 'approval', -0.06); G.market.addEffect(S, 'mkt', -0.04, 10);
+          G.news(tr('Duas semanas de estradas paradas. A greve acabou, mas a economia sentiu.', 'Two weeks of blocked roads. The strike ended, but the economy felt it.'), 'politica');
+        } },
+      ],
+      def: 0,
+    },
+    {
+      id: 'favor_familia', title: tr('Um pedido de uma família poderosa', 'A request from a powerful family'), cd: 540, weight: 3, when: S => pres(S) && !!S.fam,
+      make: S => ({ fam: G.rng.item(G.families.FAMILIES).id }),
+      text: (S, d) => tr(`A família ${G.families.byId(d.fam).n} pede uma mudança de regra que favorece o setor dela. Em troca, promete apoio no Congresso.`,
+        `The ${G.families.byId(d.fam).n} family asks for a rule change that favors their sector. In return, they promise support in Congress.`),
+      options: [
+        { label: tr('Atender', 'Grant it'), hint: tr('governabilidade +, instituições −, + sujeira', 'governability +, institutions −, + dirt'), apply(S, d) {
+          adj(S, 'gov', 0.08); nat(S).idx.inst = Math.max(5, nat(S).idx.inst - 3); S.pol.dirty += 1;
+          const x = G.families.st(S, d.fam); x.att = Math.min(100, x.att + 20);
+          G.news(tr('Você atendeu ao pedido. A família ficou grata; a imprensa, desconfiada.', 'You granted the request. The family is grateful; the press, suspicious.'), 'politica');
+        } },
+        { label: tr('Recusar', 'Refuse'), hint: tr('instituições +, a família se ressente', 'institutions +, the family resents it'), apply(S, d) {
+          nat(S).idx.inst = Math.min(100, nat(S).idx.inst + 2);
+          const x = G.families.st(S, d.fam); x.att = Math.max(-100, x.att - 20);
+          G.news(tr('Você recusou. A família não esqueceu.', 'You refused. The family did not forget.'), 'politica');
+        } },
+      ],
+      def: 1,
+    },
+    {
+      id: 'desastre', title: tr('Desastre natural', 'Natural disaster'), cd: 720, weight: 2, when: pres,
+      make: () => ({}),
+      text: () => tr('Enchentes deixam milhares de desabrigados no Sul. O país espera uma resposta do governo.',
+        'Floods leave thousands homeless in the South. The country awaits the government\'s response.'),
+      options: [
+        { label: tr('Verba emergencial', 'Emergency funds'), hint: tr('aprovação +, dívida +0,2% do PIB', 'approval +, debt +0.2% of GDP'), apply(S) {
+          nat(S).debt += 0.002; adj(S, 'approval', 0.05);
+          G.news(tr('Verba liberada e reconstrução começando. A população aprovou.', 'Funds released and rebuilding under way. The public approved.'), 'politica');
+        } },
+        { label: tr('Deixar com estados e municípios', 'Leave it to states and cities'), hint: tr('aprovação −', 'approval −'), apply(S) {
+          adj(S, 'approval', -0.08);
+          G.news(tr('A resposta lenta virou símbolo de descaso do governo.', 'The slow response became a symbol of government neglect.'), 'politica');
+        } },
+      ],
+      def: 0,
+    },
+    {
+      id: 'ministro', title: tr('Ministro sob suspeita', 'Minister under suspicion'), cd: 720, weight: 2, when: pres,
+      make: () => ({}),
+      text: () => tr('Um jornal revela que um dos seus ministros recebeu dinheiro de uma empreiteira.',
+        'A newspaper reveals that one of your ministers took money from a construction firm.'),
+      options: [
+        { label: tr('Demitir o ministro', 'Fire the minister'), hint: tr('governabilidade −, instituições +', 'governability −, institutions +'), apply(S) {
+          adj(S, 'gov', -0.05); nat(S).idx.inst = Math.min(100, nat(S).idx.inst + 2);
+          G.news(tr('Ministro demitido. O partido dele deixou a base do governo.', 'Minister fired. The minister\'s party left the governing coalition.'), 'politica');
+        } },
+        { label: tr('Proteger o ministro', 'Protect the minister'), hint: tr('aprovação −, + sujeira', 'approval −, + dirt'), apply(S) {
+          adj(S, 'approval', -0.06); S.pol.dirty += 0.5;
+          G.news(tr('Você bancou o ministro. O caso continua nas manchetes.', 'You stood by the minister. The case stays in the headlines.'), 'politica');
+        } },
+      ],
+      def: 1,
+    },
+    {
+      id: 'vizinho', title: tr('Crise na fronteira', 'Border crisis'), cd: 1080, weight: 1, when: pres,
+      make: () => ({}),
+      text: () => tr('Um país vizinho mobiliza tropas perto da fronteira depois de uma disputa comercial.',
+        'A neighboring country moves troops near the border after a trade dispute.'),
+      options: [
+        { label: tr('Diplomacia', 'Diplomacy'), hint: tr('diplomacia +', 'diplomacy +'), apply(S) {
+          nat(S).idx.dipl = Math.min(100, nat(S).idx.dipl + 4);
+          G.news(tr('Uma cúpula regional esfriou a crise. O Brasil saiu como mediador.', 'A regional summit cooled the crisis. Brazil came out as the mediator.'), 'politica');
+        } },
+        { label: tr('Mostrar força', 'Show strength'), hint: tr('defesa +, diplomacia −, aprovação +', 'defense +, diplomacy −, approval +'), apply(S) {
+          const i = nat(S).idx; i.def = Math.min(100, i.def + 3); i.dipl = Math.max(5, i.dipl - 4); adj(S, 'approval', 0.02);
+          G.news(tr('Tropas na fronteira. O vizinho recuou, mas os parceiros internacionais estranharam.', 'Troops at the border. The neighbor backed down, but international partners were uneasy.'), 'politica');
+        } },
+      ],
+      def: 0,
+    },
+  );
 
   const byId = id => CHOICES.find(c => c.id === id);
 
